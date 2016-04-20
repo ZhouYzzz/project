@@ -34,7 +34,7 @@ class DataLayer(caffe.Layer):
         return
 
     def reshape(self, bottom, top):
-        for i in len(top):
+        for i in xrange(len(top)):
             top[i].reshape(*self.buffer[i].shape)
 
     def forward(self, bottom, top):
@@ -42,7 +42,7 @@ class DataLayer(caffe.Layer):
             self.join_worker()
 
         # do forward
-        for i in len(top):
+        for i in xrange(len(top)):
             top[i].data[...] = self.buffer[i]
 
         self.dispatch_worker()

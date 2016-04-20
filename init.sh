@@ -3,4 +3,5 @@
 	&& source config.cfg \
 	|| { echo No \`cfg\` file found ;}
 
-PYTHONPATH=$ROOT/utils:$ROOT/layer:$CAFFE/python:$ROOT/caffe
+export PYTHONPATH=$CAFFE/python:$ROOT/utils:$ROOT/layer:$ROOT/database
+export PATH=$PATH:$CAFFE/build/tools

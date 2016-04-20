@@ -13,4 +13,5 @@ class MetricDataLayer(DataLayer):
 
     def init(self):
         self.db = CUHK03()
+        self.db.load()
         pass
