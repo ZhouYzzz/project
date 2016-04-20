@@ -4,17 +4,16 @@ from skimage.io import imread
 
 _TFP = os.path.dirname(__file__)
 _SRC = os.path.join(_TFP,'labeled.txt')
-_DIR = os.path.join(_TFP,'labeled')
 
 def cuhk03_reader(src):
     import pandas as pd
     df = pd.read_csv(src, sep=' ', header=None)
     num = df.shape[0]
     inames = df[0].values
-    lables = df[1].values
+    labels = df[1].values
     return num, inames, labels
 
-def iread(iname, dir=_DIR):
+def iread(iname, dir=_TFP):
     im = imread(os.path.join(dir,iname))
     return im.transpose((2,0,1))
 
@@ -32,3 +31,7 @@ class CUHK03():
 
     def get(self, idx):
         return self.data[idx], self.labels[idx]
+
+if __name__ == "__main__":
+    c = CUHK03()
+    c.load()
