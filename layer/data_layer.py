@@ -14,7 +14,13 @@ class DataLayer(caffe.Layer):
         raise Exception(
             'You should write your init function')
 
+    def check(self, bottom, top):
+        """Used for subclasses to check layer shape"""
+        pass
+
     def setup(self, bottom, top):
+        # check shape
+        self.check(bottom, top)
         # worker thread
         self.worker = None
         self.buffer = None
