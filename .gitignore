@@ -1,0 +1,29 @@
+# environ specified config file
+*.cfg
+
+# image file
+*.jpg
+*.jpeg
+*.png
+*.bmp
+
+# python .pyc file
+*.pyc
+
+# numpy binary file
+*.npy
+
+# database related
+*.h5
+data.mdb
+lock.mdb
+
+# caffe related
+*.caffemodel
+*.solverstate
+
+# sublime related
+*.sublime*
+
+# MacOS .DS_Store
+.DS_Store
