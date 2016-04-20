@@ -6,9 +6,10 @@ class MetricDataLayer(DataLayer):
     def check(self, bottom, top):
         CHECK.EQ(len(top), 2)
         pass
-        
+
     def batch_advancer(self):
-        pass
+        data, label = self.db.get(0)
+        self.buffer = (data, label)
 
     def init(self):
         self.db = CUHK03()

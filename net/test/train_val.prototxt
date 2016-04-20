@@ -1,0 +1,19 @@
+name: "test"
+layer {
+    name: "data"
+    type: "Python"
+    top: "data"
+    top: "label"
+    python_param {
+        module: "metric_data_layer"
+        layer: "MetricDataLayer"
+        share_in_parallel: true
+        param_str: ""
+    }
+}
+layer {
+    name: "silence"
+    type: "Silence"
+    bottom: "data"
+    bottom: "label"
+}

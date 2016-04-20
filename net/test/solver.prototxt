@@ -1,0 +1,6 @@
+net: "train_val.prototxt"
+lr_policy: "fixed"
+base_lr: 0.01
+display: 20
+max_iter: 20
+solver_mode: GPU
