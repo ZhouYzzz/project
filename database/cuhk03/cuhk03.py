@@ -1,6 +1,6 @@
 import numpy as np
 import os
-from skimage.io import imread
+from cv2 import imread
 
 _TFP = os.path.dirname(__file__)
 _SRC = os.path.join(_TFP,'labeled.txt')
