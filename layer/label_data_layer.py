@@ -3,7 +3,7 @@ from cuhk03 import CUHK03
 from check import CHECK
 import numpy as np
 from time import time
-from multiprocessing import Pool
+# from multiprocessing import Pool
 
 idxrg = np.arange(1945)
 BATCH = 128
@@ -31,5 +31,4 @@ class LabelDataLayer(DataLayer):
     def init(self):
         self.db = CUHK03()
         self.db.load()
-        self.pool = Pool(32)
         pass
