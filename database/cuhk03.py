@@ -7,7 +7,7 @@ _SRC = os.path.join(_TFP,'labeled.txt')
 
 def cuhk03_reader(src):
     import pandas as pd
-    df = pd.read_csv(src, sep=' ', header=None)
+    df = pd.read_csv(src, sep=' ', header=None)[:2000]
     num = df.shape[0]
     inames = df[0].values
     labels = df[1].values
@@ -25,12 +25,19 @@ class CUHK03():
 
     def load(self):
         # allocate mem space
+        print '[CUHK03]: Loading', self.N, 'images'
         self.data = np.zeros([self.N,self.C,self.H,self.W],np.uint8)
         for idx in xrange(self.N):
             self.data[idx] = iread(self.inames[idx])
 
     def get(self, idx):
         return self.data[idx], self.labels[idx]
+
+    def getd(self, idx):
+        return self.data[idx]
+
+    def getl(self, idx):
+        return self.labels[idx]
 
 if __name__ == "__main__":
     c = CUHK03()
