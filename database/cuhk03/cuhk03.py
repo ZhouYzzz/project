@@ -34,6 +34,9 @@ class CUHK03():
         return self.data[idx], self.labels[idx]
 
     def getd(self, idx):
+        if isinstance(idx, int):
+            return np.expand_dims(self.data[idx],0)
+
         return self.data[idx]
 
     def getl(self, idx):

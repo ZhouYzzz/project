@@ -43,7 +43,7 @@ class DataLayer(caffe.Layer):
 
         # do forward
         for i in xrange(len(top)):
-            top[i].data[...] = self.buffer[i]
+            top[i].data[...] = self.buffer[i].copy()
 
         self.dispatch_worker()
 

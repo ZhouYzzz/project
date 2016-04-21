@@ -1,12 +1,13 @@
 from data_layer import DataLayer
-from cuhk03 import CUHK03
+from database import CUHK03
 from check import CHECK
 import numpy as np
 from time import time
 # from multiprocessing import Pool
 
 idxrg = np.arange(1945)
-BATCH = 128
+idx2d = np.expand_dims(idxrg,1)
+BATCH = 256
 
 class LabelDataLayer(DataLayer):
     def check(self, bottom, top):
@@ -16,6 +17,7 @@ class LabelDataLayer(DataLayer):
     def batch_advancer(self):
         #t = time()
         batch = np.random.choice(idxrg, BATCH)
+        #print batch
         #data, label = self.db.get(np.random.choice(idxrg,BATCH,False))
         #self.buffer = (data, label)
         data = list()
@@ -23,8 +25,9 @@ class LabelDataLayer(DataLayer):
             data.append(self.db.getd(idx))
 
         #print 'Pool took', time()-t
-        data = np.concatenate(data)
+        data = np.vstack(data)
         label = self.db.getl(batch)
+        #print label
         self.buffer = (data, label)
         #print 'BATCH ADVANCER TOOK', time()-t
 

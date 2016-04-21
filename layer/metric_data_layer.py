@@ -1,5 +1,5 @@
 from data_layer import DataLayer
-from cuhk03 import CUHK03
+from database import CUHK03
 from check import CHECK
 
 class MetricDataLayer(DataLayer):
