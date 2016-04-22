@@ -1,3 +1,4 @@
 from data_layer import DataLayer
 from metric_data_layer import MetricDataLayer
 from label_data_layer import LabelDataLayer
+from triplet_data_layer import TripletDataLayer

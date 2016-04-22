@@ -29,3 +29,10 @@ class CHECK():
             return
         else:
             raise CheckError(A,'Not Less than',B)
+
+    @classmethod
+    def RD(self,A,B,alpha=1e-5):
+        if ((A-B)>=alpha or (B-A)>=alpha):
+            raise CheckError(A,'Not around',B)
+        else:
+            return
