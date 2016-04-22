@@ -1,6 +1,6 @@
 from data_layer import DataLayer
 from database import CUHK03
-from check import CHECK
+from utils import CHECK
 import numpy as np
 from time import time
 # from multiprocessing import Pool

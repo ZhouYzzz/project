@@ -1,7 +1,7 @@
 from threading import Thread
 
 import caffe
-from check import CHECK
+from utils import CHECK
 
 class DataLayer(caffe.Layer):
     def batch_advancer(self):

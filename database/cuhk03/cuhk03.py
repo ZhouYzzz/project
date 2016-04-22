@@ -35,12 +35,22 @@ class CUHK03():
 
     def getd(self, idx):
         if isinstance(idx, int):
-            return np.expand_dims(self.data[idx],0)
+            return self.data[[idx]]
 
         return self.data[idx]
 
     def getl(self, idx):
         return self.labels[idx]
+
+    def get4d(self, idx):
+        self.getd(idx)
+
+    def get3d(self, idx):
+        assert isinstance(idx, int)
+        return self.data[idx]
+
+    def test_set(self, idx):
+        pass
 
 if __name__ == "__main__":
     c = CUHK03()
