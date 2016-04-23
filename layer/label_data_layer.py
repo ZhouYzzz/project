@@ -22,6 +22,11 @@ class LabelDataLayer(DataLayer):
         label = self.db.getl(batch)
         self.buffer = (data, label)
 
+    def batch_forward(self, top):
+        for i in xrange(len(top)):
+            top[i].data[...] = self.buffer[i].copy()
+
+
     def init(self):
         self.db = CUHK03()
         self.db.load()

@@ -18,6 +18,11 @@ class DataLayer(caffe.Layer):
         """Used for subclasses to check layer shape"""
         pass
 
+    def batch_forward(self, top):
+        """called each forward"""
+        raise Exception(
+            'No forward specified')
+
     def setup(self, bottom, top):
         # check shape
         self.check(bottom, top)
@@ -42,8 +47,9 @@ class DataLayer(caffe.Layer):
             self.join_worker()
 
         # do forward
-        for i in xrange(len(top)):
-            top[i].data[...] = self.buffer[i].copy()
+        self.batch_forward(top)
+        # for i in xrange(len(top)):
+        #     top[i].data[...] = self.buffer[i].copy()
 
         self.dispatch_worker()
 

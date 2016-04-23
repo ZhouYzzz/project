@@ -1,6 +1,7 @@
 from data_layer import DataLayer
 from database import CUHK03
 from utils import CHECK
+import numpy as np
 
 BATCH = 128
 
@@ -10,8 +11,19 @@ class MetricDataLayer(DataLayer):
         pass
 
     def batch_advancer(self):
-        data, label = self.db.gen_pair(BATCH)
+        data = list()
+        label = list()
+        for i in xrange(BATCH):
+            d, l = self.db.gen_pair()
+            data.append(d)
+            label.append(l)
+
         self.buffer = (data, label)
+
+    def batch_forward(self, top):
+        (data, label) = self.buffer
+        for i in xrange(BATCH):
+            top[0].data = data[0]
 
     def init(self):
         self.db = CUHK03()

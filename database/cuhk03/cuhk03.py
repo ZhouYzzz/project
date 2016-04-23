@@ -40,6 +40,7 @@ class CUHK03():
     def load(self):
         # allocate mem space
         print '[CUHK03]: Loading', self.N, 'images,', self.NC, 'Class.'
+        # init cls idx
         self.clsidx = self.init_cls2idx()
         self.data = np.zeros([self.N,self.C,self.H,self.W],np.uint8)
         for idx in xrange(NI):
@@ -78,6 +79,10 @@ class CUHK03():
     def cls2idx(self, cls):
         return self.clsidx[cls]
 
+    def choice(self, cls, n):
+        '''gen `n` idx of cls'''
+        return np.random.choice(self.cls2idx(cls), n)
+
     def rand_not_cls(self, cls):
         CHECK.GT(cls,0); CHECK.LT(cls,300)
         r = np.random.randint(*[0,300])
@@ -104,7 +109,11 @@ class CUHK03():
         pass
 
     def gen_pair(self, cls):
-        pass
+        '''genpair'''
+        if bool(genrandbits(1)):
+            return (self.gensim(cls),1)
+        else:
+            return (self.gendif(cls),0)
 
     def gen_pair_test(self, cls):
         pass
