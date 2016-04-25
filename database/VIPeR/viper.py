@@ -17,8 +17,8 @@ def iread(imf,root=_TFP):
 class VIPeR():
     def __init__(self):
         """ VIPeR only have 2 images for each identity, one in a view """
-        self.A = pd.read_csv('a.txt',sep=' ',header=None)[0].tolist()
-        self.B = pd.read_csv('b.txt',sep=' ',header=None)[0].tolist()
+        self.A = pd.read_csv(_TFP+'/a.txt',sep=' ',header=None)[0].tolist()
+        self.B = pd.read_csv(_TFP+'/b.txt',sep=' ',header=None)[0].tolist()
         assert (len(self.A) == len(self.B))
         self.load()
         pass
@@ -58,26 +58,26 @@ class VIPeR():
         else:
             return self.dB[idx]
 
-    def _gen_sim(self, idx, crop=True, cropsize=(240,120)):
+    def _gen_sim(self, idx, ifcrop=True, cropsize=(240,120)):
         A = self.getA(idx)
         B = self.getB(idx)
         AB = np.concatenate((A,B),axis=1)
-        if crop: return crop(AB, cropsize[0], cropsize[1])
+        if (ifcrop): return crop(AB, cropsize[0], cropsize[1])
         else: return AB
 
-    def _gen_dif(self, idx, crop=True, cropsize=(240,120)):
+    def _gen_dif(self, idx, ifcrop=True, cropsize=(240,120)):
         A = self.getA(idx)
         B = self.getB(self._rand_not_idx(idx))
         AB = np.concatenate((A,B),axis=1)
-        if crop: return crop(AB, cropsize[0], cropsize[1])
+        if (ifcrop): return crop(AB, cropsize[0], cropsize[1])
         else: return AB
     
-    def gen_valid(self, batch=128, crop=True, cropsize=(240,120)):
-        randidx = np.random.randint(self.N, batch/2)
+    def gen_valid(self, batch=128, ifcrop=True, cropsize=(240,120)):
+        randidx = np.random.randint(0, self.N, batch/2)
         pair_batch = list()
         for idx in randidx:
-            pair_batch.append(self._gen_sim(idx, crop, cropsize))
-            pair_batch.append(self._gen_dif(idx, crop, cropsize))
+            pair_batch.append(self._gen_sim(idx, ifcrop, cropsize))
+            pair_batch.append(self._gen_dif(idx, ifcrop, cropsize))
         return np.vstack(pair_batch)
 
     def _rand_not_idx(self, idx):
@@ -89,4 +89,5 @@ class VIPeR():
 if __name__ == "__main__":
     db = VIPeR()
     db.get_test()
+    print db.gen_valid().shape
 

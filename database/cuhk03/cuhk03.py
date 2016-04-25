@@ -1,7 +1,10 @@
+#!/usr/bin/python
+
 import numpy as np
 import os
 from utils import CHECK, crop
 from cv2 import imread
+from random import getrandbits
 
 _TFP = os.path.dirname(__file__)
 _SRC = os.path.join(_TFP,'labeled.txt')
@@ -27,14 +30,17 @@ def cuhk03_reader(src, NI):
     return num, inames, labels, num_cls
 
 def iread(iname, dir=_TFP):
+    # print dir, iname
     im = imread(os.path.join(dir,iname))
-    return im.transpose((2,0,1))
+    assert im is not None
+    return im.transpose((2,0,1))[np.newaxis,...]
 
 class CUHK03():
     '''INIT functions'''
     def __init__(self, NI=3898): # 400 classes
-        self.N, self.inames, self.labels, self.NC = cuhk03_reader(_SRC)
-        self.C, self.H, self.W = iread(self.inames[0]).shape
+        self.N, self.inames, self.labels, self.NC = cuhk03_reader(_SRC, NI)
+        # print iread(self.inames[0]).shape
+        _, self.C, self.H, self.W = iread(self.inames[0]).shape
         pass
 
     def load(self):
@@ -42,20 +48,24 @@ class CUHK03():
         print '[CUHK03]: Loading', self.N, 'images,', self.NC, 'Class.'
         # init cls idx
         self.clsidx = self.init_cls2idx()
-        self.data = np.zeros([self.N,self.C,self.H,self.W],np.uint8)
-        for idx in xrange(NI):
-            self.data[idx] = iread(self.inames[idx])
-    
+        # self.data = np.zeros([self.N,self.C,self.H,self.W],np.uint8)
+        self.data = list()
+        for idx in xrange(self.N):
+            # self.data[idx] = iread(self.inames[idx])
+            self.data.append(iread(self.inames[idx]))
+
+        print '[CUHK03]: Finished'
+
+        # print len(self.data), self.data[0].shape
+
     '''GET functions'''
     def get(self, idx):
         return self.data[idx], self.labels[idx]
 
     def getd(self, idx):
-        if isinstance(idx, int):
-            return self.data[[idx]]
-
+        assert isinstance(idx, int)
         return self.data[idx]
-    
+
     def getl(self, idx):
         return self.labels[idx]
 
@@ -108,21 +118,34 @@ class CUHK03():
             (d, l) = self.gen_pair(cls)
         pass
 
-    def gen_pair(self, cls):
+    def gen_pair(self, cls, ifcrop=True, cropsize=(240,120)):
         '''genpair'''
-        if bool(genrandbits(1)):
-            return (self.gensim(cls),1)
+        if bool(getrandbits(1)):
+            return (self.gen_sim(cls, ifcrop, cropsize),1)
         else:
-            return (self.gendif(cls),0)
+            return (self.gen_dif(cls, ifcrop, cropsize),0)
 
     def gen_pair_test(self, cls):
         pass
 
-    def gen_sim(self, cls):
-        pass
+    def gen_sim(self, cls, ifcrop=True, cropsize=(240,120)):
+        [iA, iB] = self.choice(cls, 2)
+        A = self.getd(iA)
+        B = self.getd(iB)
+        # print A.shape, B.shape
+        AB = np.concatenate((A,B),axis=1)
+        if (ifcrop): return crop(AB,cropsize[0],cropsize[1])
+        else: return AB
 
-    def gen_dif(self, cls):
-        pass
+    def gen_dif(self, cls, ifcrop=True, cropsize=(240,120)):
+        [iA] = self.choice(cls, 1)
+        [iB] = self.choice(self.rand_not_cls(cls), 1)
+        A = self.getd(iA)
+        B = self.getd(iB)
+        # print A.shape, B.shape
+        AB = np.concatenate((A,B),axis=1)
+        if (ifcrop): return crop(AB,cropsize[0],cropsize[1])
+        else: return AB
 
     def gen_sim_test(self, cls):
         pass
@@ -136,3 +159,10 @@ class CUHK03():
 if __name__ == "__main__":
     c = CUHK03()
     c.load()
+    from time import time
+    t = time()
+    N = 100
+    for i in xrange(N):
+        c.gen_pair(2)
+
+    print 'Loading',N,'pairs took',time() - t
