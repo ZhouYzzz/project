@@ -79,7 +79,7 @@ class CUHK03():
     '''INDEX functions'''
     def init_cls2idx(self):
         clsidx = list()
-        for i in xrange(400):
+        for i in xrange(self.NC):
             idx = np.where(self.labels == i)[0].tolist()
             CHECK.GT(len(idx),1)
             clsidx.append(idx)
