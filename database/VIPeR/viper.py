@@ -71,14 +71,19 @@ class VIPeR():
         AB = np.concatenate((A,B),axis=1)
         if (ifcrop): return crop(AB, cropsize[0], cropsize[1])
         else: return AB
-    
+
     def gen_valid(self, batch=128, ifcrop=True, cropsize=(240,120)):
         randidx = np.random.randint(0, self.N, batch/2)
         pair_batch = list()
+        list_batch = list()
         for idx in randidx:
+            # SIM
             pair_batch.append(self._gen_sim(idx, ifcrop, cropsize))
+            list_batch.append(1)
+            # DIF
             pair_batch.append(self._gen_dif(idx, ifcrop, cropsize))
-        return np.vstack(pair_batch)
+            list_batch.append(0)
+        return (np.vstack(pair_batch), np.vstack(list_batch))
 
     def _rand_not_idx(self, idx):
         r = np.random.randint(self.N)

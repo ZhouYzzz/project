@@ -6,7 +6,7 @@ layer {
     top: "label"
     python_param {
         module: "layer"
-        layer: "LabelDataLayer"
+        layer: "MetricDataLayer"
         share_in_parallel: true
         param_str: ""
     }

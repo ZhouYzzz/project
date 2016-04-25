@@ -1,18 +1,17 @@
 from data_layer import DataLayer
-from database import CUHK03
+from database import VIPeR
 from utils import CHECK
 import numpy as np
 
-BATCH = 256
+# BATCH = 128
 
-class MetricDataLayer(DataLayer):
+class ValidMetricDataLayer(DataLayer):
     def check(self, bottom, top):
         CHECK.EQ(len(top), 2)
         pass
 
     def batch_advancer(self):
-        (data, label) = self.db.gen_batch(BATCH)
-        self.buffer = (np.vstack(data), np.vstack(label))
+        self.buffer = self.db.gen_valid()
 
     def batch_forward(self, top):
         (data, label) = self.buffer
@@ -20,6 +19,5 @@ class MetricDataLayer(DataLayer):
         top[1].data[...] = label
 
     def init(self):
-        self.db = CUHK03()
-        self.db.load()
+        self.db = VIPeR()
         pass

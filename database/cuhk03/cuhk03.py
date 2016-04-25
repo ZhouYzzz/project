@@ -94,14 +94,15 @@ class CUHK03():
         return np.random.choice(self.cls2idx(cls), n)
 
     def rand_not_cls(self, cls):
-        CHECK.GT(cls,0); CHECK.LT(cls,300)
-        r = np.random.randint(*[0,300])
+        CHECK.GT(cls,0); CHECK.LT(cls,self.NC)
+        r = np.random.randint(*[0,self.NC])
         if (r==cls):
             return self.rand_not_cls(cls)
         else:
             return r
 
     def rand_not_cls_test(self, cls):
+        exit() # under construction
         CHECK.GT(cls,300); CHECK.LT(cls,400)
         r = np.random.randint(*[300,400])
         if (r==cls):
@@ -111,12 +112,14 @@ class CUHK03():
 
     '''GENERATE functions'''
     def gen_batch(self, batch):
-        randcls = np.random.choice(np.arange(0,300),batch)
+        randcls = np.random.choice(np.arange(self.NC),batch)
         data = list()
         lst = list()
         for cls in randcls:
             (d, l) = self.gen_pair(cls)
-        pass
+            data.append(d)
+            lst.append(l)
+        return (data, lst)
 
     def gen_pair(self, cls, ifcrop=True, cropsize=(240,120)):
         '''genpair'''
@@ -161,8 +164,6 @@ if __name__ == "__main__":
     c.load()
     from time import time
     t = time()
-    N = 100
-    for i in xrange(N):
-        c.gen_pair(2)
-
+    N = 200
+    c.gen_batch(N)
     print 'Loading',N,'pairs took',time() - t
