@@ -1,5 +1,5 @@
 #!/usr/bin/python
-from experiment import test_on_VIPeR
+from experiment import test_on_VIPeR, deep_method
 import argparse, os, sys
 
 _TFP = os.path.dirname(__file__)
@@ -24,15 +24,12 @@ def check_arg(args):
     assert os.path.isfile(args.net)
     assert os.path.isfile(args.model)
 
-class deep_feat():
-    def __init__():
-        pass
-
-    def __call__():
-        pass
-
 if __name__ == '__main__':
     args = parse_args()
     check_arg(args)
 
+    method = deep_method(args.net, args.model)
+
+    result=test_on_VIPeR(method)
+    print result.shape, result[:50]
     pass

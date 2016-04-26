@@ -1,6 +1,6 @@
 #!/usr/bin/python
 from database import VIPeR
-from utils import CHECK
+from utils import CHECK, crop
 import numpy as np
 
 class default_method():
@@ -17,11 +17,17 @@ class deep_method():
 
     def __call__(self, data):
         num = data.shape[0]
-        net.blobs['data'].reshape(*data.shape)
-        return net.forward(data=data)['feat'].reshape(num,-1)
+        shape = self.net.blobs['data'].data.shape
+        crop_data = np.zeros([num,shape[1],shape[2],shape[3]],np.uint8)
+        for i in xrange(num):
+            crop_data[i] = crop(data[i],shape[2],shape[3])
 
-def L2_connect(f1, f2):
-    pass
+        self.net.blobs['data'].reshape(*crop_data.shape)
+        return self.net.forward(data=crop_data)['feat'].reshape(num,-1).copy()
+
+def L2_connect(f, f_gallery):
+    dist = f_gallery - f
+    return -np.linalg.norm(dist, ord=2, axis=1)
 
 def test_on_VIPeR(method_instance, connect_func=L2_connect):
     db = VIPeR()
@@ -38,9 +44,16 @@ def test_on_VIPeR(method_instance, connect_func=L2_connect):
     CHECK.EQ(2, len(gallery_feat.shape))
 
     print '[TEST] begin ranking'
+    CMC = np.zeros(N)
     for i in xrange(N):
-        f1 = query_feat[i]
-        connect_func(query_feat)
+        qf = query_feat[i]
+        # connect function: great means similar
+        similarity = connect_func(qf, gallery_feat)
+        rank = np.where((-similarity).argsort() == i)[0][0]
+        CMC[rank:] += 1
+
+    CMC = CMC/N
+    return CMC
 
 if __name__ == '__main__':
     test_on_VIPeR(default_method())
