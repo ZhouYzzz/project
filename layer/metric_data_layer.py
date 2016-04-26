@@ -3,7 +3,7 @@ from database import CUHK03
 from utils import CHECK
 import numpy as np
 
-BATCH = 256
+BATCH = 128
 
 class MetricDataLayer(DataLayer):
     def check(self, bottom, top):

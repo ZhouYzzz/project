@@ -35,6 +35,10 @@ layer {
   bottom: "pair_data"
   top: "data"
   top: "data_p"
+  slice_param {
+	slice_dim: 1
+	slice_point: 3
+  }
 }
 layer {
   name: "conv1"
@@ -100,7 +104,7 @@ layer {
   convolution_param {
     num_output: 64
     kernel_size: 3
-    stride: 2
+    stride: 1
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -129,9 +133,55 @@ layer {
   }
 }
 layer {
+  name: "conv3"
+  type: "Convolution"
+  bottom: "pool2"
+  top: "conv3"
+  param {
+    name: "conv3"
+    lr_mult: 1
+    decay_mult: 0
+  }
+  param {
+    name: "conv3_b"
+    lr_mult: 1
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 64
+    kernel_size: 3
+    stride: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu3"
+  type: "ReLU"
+  bottom: "conv3"
+  top: "conv3"
+}
+layer {
+  name: "pool3"
+  type: "Pooling"
+  bottom: "conv3"
+  top: "pool3"
+  pooling_param {
+    pool: MAX
+    kernel_size: 2
+    stride: 2
+  }
+}
+layer {
   name: "ip1"
   type: "InnerProduct"
-  bottom: "pool2"
+  bottom: "pool3"
   top: "ip1"
   param {
     name: "ip1"
@@ -144,7 +194,7 @@ layer {
     decay_mult: 0
   }
   inner_product_param {
-    num_output: 2048
+    num_output: 1024
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -228,7 +278,7 @@ layer {
   convolution_param {
     num_output: 64
     kernel_size: 3
-    stride: 2
+    stride: 1
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -257,9 +307,55 @@ layer {
   }
 }
 layer {
+  name: "conv3_p"
+  type: "Convolution"
+  bottom: "pool2_p"
+  top: "conv3_p"
+  param {
+    name: "conv3"
+    lr_mult: 1
+    decay_mult: 0
+  }
+  param {
+    name: "conv3_b"
+    lr_mult: 1
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 64
+    kernel_size: 3
+    stride: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu3_p"
+  type: "ReLU"
+  bottom: "conv3_p"
+  top: "conv3_p"
+}
+layer {
+  name: "pool3_p"
+  type: "Pooling"
+  bottom: "conv3_p"
+  top: "pool3_p"
+  pooling_param {
+    pool: MAX
+    kernel_size: 2
+    stride: 2
+  }
+}
+layer {
   name: "ip1_p"
   type: "InnerProduct"
-  bottom: "pool2_p"
+  bottom: "pool3_p"
   top: "ip1_p"
   param {
     name: "ip1"
@@ -272,7 +368,7 @@ layer {
     decay_mult: 0
   }
   inner_product_param {
-    num_output: 2048
+    num_output: 1024
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -299,7 +395,12 @@ layer {
   bottom: "feat_p"
   bottom: "label"
   top: "loss"
+  #top: "dist_sim"
+  #top: "dist_dif"
+  #loss_weight: 1
+  #loss_weight: 0
+  #loss_weight: 0
   contrastive_loss_param {
-    margin: 1
+    margin: 2
   }
 }

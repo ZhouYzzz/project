@@ -135,10 +135,13 @@ class CUHK03():
         [iA, iB] = self.choice(cls, 2)
         A = self.getd(iA)
         B = self.getd(iB)
+        if (ifcrop):
+            A = crop(A,cropsize[0],cropsize[1])
+            B = crop(B,cropsize[0],cropsize[1])
         # print A.shape, B.shape
         AB = np.concatenate((A,B),axis=1)
-        if (ifcrop): return crop(AB,cropsize[0],cropsize[1])
-        else: return AB
+        # if (ifcrop): return crop(AB,cropsize[0],cropsize[1])
+        return AB
 
     def gen_dif(self, cls, ifcrop=True, cropsize=(240,120)):
         [iA] = self.choice(cls, 1)
@@ -146,9 +149,13 @@ class CUHK03():
         A = self.getd(iA)
         B = self.getd(iB)
         # print A.shape, B.shape
+        if (ifcrop):
+            A = crop(A,cropsize[0],cropsize[1])
+            B = crop(B,cropsize[0],cropsize[1])
+        # print A.shape, B.shape
         AB = np.concatenate((A,B),axis=1)
-        if (ifcrop): return crop(AB,cropsize[0],cropsize[1])
-        else: return AB
+        # if (ifcrop): return crop(AB,cropsize[0],cropsize[1])
+        return AB
 
     def gen_sim_test(self, cls):
         pass
