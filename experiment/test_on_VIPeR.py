@@ -16,9 +16,14 @@ class deep_method():
         self.net = caffe.Net(proto, model, caffe.TEST)
 
     def __call__(self, data):
-        return 0
+        num = data.shape[0]
+        net.blobs['data'].reshape(*data.shape)
+        return net.forward(data=data)['feat'].reshape(num,-1)
 
-def test_on_VIPeR(method_instance):
+def L2_connect(f1, f2):
+    pass
+
+def test_on_VIPeR(method_instance, connect_func=L2_connect):
     db = VIPeR()
     query, gallery = db.get_test()
     N = query.shape[0]
@@ -34,7 +39,8 @@ def test_on_VIPeR(method_instance):
 
     print '[TEST] begin ranking'
     for i in xrange(N):
-        pass
+        f1 = query_feat[i]
+        connect_func(query_feat)
 
 if __name__ == '__main__':
     test_on_VIPeR(default_method())
