@@ -53,10 +53,10 @@ void ContrastiveLossLayer<Dtype>::Forward_gpu(
     }
   }
   loss = loss / static_cast<Dtype>(bottom[0]->num()) / Dtype(2);
-  std::cout << "[SIM] " << dist_sim/sim_c << " [DIF] " << dist_dif/dif_c << std::endl;
+  //std::cout << "[SIM] " << dist_sim/sim_c << " [DIF] " << dist_dif/dif_c << std::endl;
   top[0]->mutable_cpu_data()[0] = loss;
-  //top[1]->mutable_cpu_data()[0] = dist_sim/sim_c;
-  //top[2]->mutable_cpu_data()[0] = dist_dif/dif_c;
+  top[1]->mutable_cpu_data()[0] = dist_sim/sim_c;
+  top[2]->mutable_cpu_data()[0] = dist_dif/dif_c;
 }
 
 template <typename Dtype>

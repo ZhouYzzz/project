@@ -395,11 +395,11 @@ layer {
   bottom: "feat_p"
   bottom: "label"
   top: "loss"
-  #top: "dist_sim"
-  #top: "dist_dif"
-  #loss_weight: 1
-  #loss_weight: 0
-  #loss_weight: 0
+  top: "dist_sim"
+  top: "dist_dif"
+  loss_weight: 1
+  loss_weight: 0
+  loss_weight: 0
   contrastive_loss_param {
     margin: 2
   }
