@@ -28,7 +28,39 @@ def kernel_correlation(x1, x2, sigma):
     fft2(x1)
     pass
 
+def W(xf, yf, lam=0):
+    return (yf*xf.conj())/(xf*xf.conj()+lam)
+
+def RM(Wf, zf):
+    return ifft(Wf*zf.conj())
+
 if __name__ == '__main__':
-    x1 = np.ones([4,4,3])
-    x2 = np.ones([4,4,3])
-    kernel_correlation(x1, x2, 0.5)
+    x1 = np.array([
+        [1,0,0,0],
+        [0,0,0,0],
+        [0,0,0,0],
+        [0,0,0,0]])
+    x2 = np.array([
+        [0,0,0,0],
+        [0,0,1,0],
+        [0,0,0,0],
+        [0,0,0,0]])
+    yf = np.hanning(4)
+    print(yf)
+    exit()
+    xf1 = fft(x1)
+    xf2 = fft(x2)
+    # print yf
+    # print xf1
+    Wf = W(xf1, yf)
+    rm = RM(Wf, xf2)
+    print rm.real
+
+
+
+
+
+
+
+
+
