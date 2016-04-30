@@ -1,16 +1,16 @@
 name: "metric_split_cuhk03"
-input: "anchor/data"
+input: "data"
   input_shape {
-    dim: 1
+    dim: 316
     dim: 3
     dim: 240
     dim: 120
   }
 
 layer {
-  name: "data"
+  name: "split"
   type: "Python"
-  bottom: "anchor/data"
+  bottom: "data"
   top: "anchor/0/data"
   top: "anchor/1/data"
   top: "anchor/2/data"
@@ -45,7 +45,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 1
+      stride: 2
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -94,7 +94,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 1
+      stride: 2
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -143,7 +143,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 1
+      stride: 2
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -440,7 +440,7 @@ layer {
   bottom: "anchor/0/feat"
   bottom: "anchor/1/feat"
   bottom: "anchor/2/feat"
-  top: "anchor/feat"
+  top: "feat"
   concat_param {
     axis: 1
   }

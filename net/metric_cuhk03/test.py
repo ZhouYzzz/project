@@ -31,5 +31,10 @@ if __name__ == '__main__':
     method = deep_method(args.net, args.model)
 
     result=test_on_VIPeR(method)
-    print result.shape, result[:50]
-    pass
+
+    print '===================='
+    print ' CMC Curve on VIPeR '
+    print '===================='
+    for i in [1, 2, 10, 20, 30, 50, 100, 200]:
+        print 'TOP%4d'%i,'%10.2f'%(result[i-1]*100),'%'
+        print '--------------------'

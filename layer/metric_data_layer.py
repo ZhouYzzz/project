@@ -20,6 +20,6 @@ class MetricDataLayer(DataLayer):
         top[1].data[...] = label
 
     def init(self):
-        self.db = CUHK03(1935)
+        self.db = CUHK03(12661)
         self.db.load()
         pass

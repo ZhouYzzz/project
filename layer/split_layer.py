@@ -13,8 +13,9 @@ class SplitLayer(caffe.Layer):
         pass
 
     def reshape(self, bottom, top):
-        pass
-    
+        for i in xrange(3):
+            top[i].reshape(*(self.N, self.C, self.S, self.W))
+
     def forward(self, bottom, top):
         S = self.S
         top[0].data[...] = bottom[0].data[:,:,:S,:]

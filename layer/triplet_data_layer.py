@@ -1,6 +1,6 @@
 from data_layer import DataLayer
 from database import CUHK03
-from check import CHECK
+from utils import CHECK
 
 class TripletDataLayer(DataLayer):
     def check(self, bottom, top):

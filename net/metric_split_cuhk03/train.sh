@@ -1,3 +1,2 @@
 #!/bin/sh
-TFP=$(dirname $0)
-caffe train -solver=$TFP/solver.prototxt -gpu=2
+caffe train -solver=solver.prototxt -gpu=1
