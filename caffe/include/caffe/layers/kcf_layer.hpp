@@ -14,7 +14,7 @@ class KCFLayer: public Layer<Dtype> {
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Rshape(const vector<Blob<Dtype>*>& bottom,
-      const vector<BLOB<Dtype>*>& top);
+      const vector<Blob<Dtype>*>& top);
 
   virtual inline const char* type() const { return "KCF"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }

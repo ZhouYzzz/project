@@ -3,7 +3,7 @@
 
 #include "caffe/layers/kcf_layer.hpp"
 #include "caffe/util/math_functions.hpp"
-#include "cufft.h"
+// #include "cufft.h"
 
 namespace caffe {
 
@@ -14,7 +14,7 @@ void KCFLayer<Dtype>::Forward_gpu(
 }
 
 template <typename Dtype>
-void CuDNNConvolutionLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
+void KCFLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
 
 }
