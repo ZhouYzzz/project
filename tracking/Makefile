@@ -1,4 +1,6 @@
 ROOT:=1
 
+CUDA:=/usr/local/cuda
+
 all:
-	@ echo $(ROOT)
+	nvcc -I$(CUDA)/include -lcufft cukcf.cu -o cukcf

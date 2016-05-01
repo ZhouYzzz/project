@@ -8,3 +8,6 @@ from triplet_data_layer import TripletDataLayer
 # Functional Layers
 from analyse_layer import AnalyseLayer
 from split_layer import SplitLayer
+
+# Test Layers
+from test_kcf_layer import TestKCFLayer

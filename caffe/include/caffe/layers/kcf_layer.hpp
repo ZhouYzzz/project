@@ -3,6 +3,7 @@
 
 #include "caffe/blob.hpp"
 #include "caffe/layer.hpp"
+#include "caffe/proto/caffe.pb.h"
 
 namespace caffe {
 
@@ -13,7 +14,7 @@ class KCFLayer: public Layer<Dtype> {
       : Layer<Dtype>(param) {}
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
-  virtual void Rshape(const vector<Blob<Dtype>*>& bottom,
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
   virtual inline const char* type() const { return "KCF"; }
@@ -25,6 +26,10 @@ class KCFLayer: public Layer<Dtype> {
       const vector<Blob<Dtype>*>& top);
   virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+	  const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+	  const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 };
 
 }

@@ -2,5 +2,5 @@
 . init.sh
 cp -a $ROOT/caffe/. $CAFFE/.
 cd $CAFFE
-make -j8
+make
 cd $ROOT

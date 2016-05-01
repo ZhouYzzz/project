@@ -1,0 +1,23 @@
+layer {
+  name: "data"
+  type: "Python"
+  top: "frame"
+  top: "label"
+  python_param {
+    module: "layer"
+	layer: "ValidMetricDataLayer"
+	share_in_parallel: true
+	param_str: ""
+  }
+}
+layer {
+  name: "kcf"
+  type: "KCF"
+  bottom: "frame"
+  top: "sth"
+}
+layer {
+  name: "slc"
+  type: "Silence"
+  bottom: "label"
+}
