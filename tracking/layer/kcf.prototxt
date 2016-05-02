@@ -11,13 +11,35 @@ layer {
   }
 }
 layer {
-  name: "kcf"
-  type: "KCF"
-  bottom: "frame"
-  top: "sth"
+  name: "ref"
+  type: "Python"
+  top: "ref"
+  python_param {
+    module: "layer"
+	layer: "RefLayer"
+	param_str: ""
+  }
 }
+layer {
+  name: "crop"
+  type: "Crop"
+  bottom: "frame"
+  bottom: "ref"
+  top: "croped"
+  crop_param {
+    axis: 2
+	offset: 60
+  }
+}
+#layer {
+#  name: "kcf"
+#  type: "KCF"
+#  bottom: "frame"
+#  top: "sth"
+#}
 layer {
   name: "slc"
   type: "Silence"
   bottom: "label"
+  bottom: "croped"
 }

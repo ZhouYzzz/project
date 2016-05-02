@@ -11,3 +11,4 @@ from split_layer import SplitLayer
 
 # Test Layers
 from test_kcf_layer import TestKCFLayer
+from ref_layer import RefLayer

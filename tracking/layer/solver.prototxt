@@ -1,0 +1,23 @@
+net: "kcf.prototxt"
+
+# TRAINing rate and policy
+lr_policy: "fixed"
+base_lr: 0.01
+momentum: 0.9
+
+# TRAINing iter
+max_iter: 20
+
+# TESTing iter and interval
+# test_iter: 1
+# test_interval: 100
+
+# display
+display: 20
+
+# snapshots
+#snapshot: 2000
+#snapshot_prefix: "snapshots/train_val"
+
+# GPU / CPU
+solver_mode: GPU

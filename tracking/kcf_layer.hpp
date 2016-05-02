@@ -5,6 +5,11 @@
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 
+#include "cufft.h"
+#include "vector_types.h"
+#include <boost/type_traits.hpp>
+#include <boost/static_assert.hpp>
+
 namespace caffe {
 
 template <typename Dtype>
@@ -30,6 +35,24 @@ class KCFLayer: public Layer<Dtype> {
 	  const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
 	  const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+ private:
+  int N_, C_, H_, W_;
+
+  cufftHandle plan_;
+  cufftHandle iplan_;
+  
+  //cufftComplex* xf_;
+  
+  //cufftDoubleComplex* xf_d;
+  Blob<cufftComplex> xf_;
+//   typedef typename boost::conditional
+// 	  <boost::is_same<Dtype,float>::value,
+// 	  cufftComplex,cufftDoubleComplex>::type Complex;
+//   Complex* xf_;
+//   typedef typename boost::conditional
+// 	  <boost::is_same<Dtype,float>::value,
+//	  cufftReal,cufftDoubleReal>::type Real;
 };
 
 }

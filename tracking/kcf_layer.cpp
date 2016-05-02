@@ -7,7 +7,20 @@ namespace caffe {
 template <typename Dtype>
 void KCFLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
-  //std::cout << "SETUP" << std::endl;
+  N_ = bottom[0]->num();
+  C_ = bottom[0]->channels();
+  H_ = bottom[0]->height();
+  W_ = bottom[0]->width();
+  int n[2] = {H_, W_};
+  xf_.Reshape(N_, C_, H_, W_/2+1);
+  if (cufftPlanMany(&plan_, 2, n,
+			NULL, 1, 0,
+			NULL, 1, 0,
+			CUFFT_R2C, N_*C_) != CUFFT_SUCCESS) {
+	fprintf(stderr, "CUFFT Error: Unable to create plan\n");
+  }
+  //cudaMalloc((void**)& xf_, sizeof(Complex)*H_*(W_/2+1));
+  //cudaMalloc((void**)& xf_d, sizeof(cufftDoubleComplex)*H_*(W_/2+1));
   return;
 }
 
