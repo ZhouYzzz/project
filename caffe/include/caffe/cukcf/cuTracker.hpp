@@ -73,6 +73,7 @@ class cuTracker {
 		cuComplex one_;
 		cuComplex* ones_; // length: 1*H*W, for sum operation
 		cuComplex zero_;
+		cuComplex null_;
 
 		float* resp_; // detect response
 
@@ -98,6 +99,8 @@ class cuTracker {
 
 // help functions for complex
 namespace caffe {
+// set
+void caffe_gpu_set_C(const int N, const cuComplex alpha, cuComplex* dst);
 // real(a)
 void caffe_gpu_real_C(const int N, const cuComplex* a, float* dst);
 // a .+ b
