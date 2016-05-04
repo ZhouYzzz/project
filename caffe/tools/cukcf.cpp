@@ -114,6 +114,9 @@ protected:
 
 	void linearCorrelation(cuComplex* xf1, cuComplex* xf2, cuComplex* k);
 
+	// gpu memory space initialization
+	void allocate_mem_space(int N, int C, int H, int W);
+
 	int id;
 	int N, C, H, W, n; // input shape
 	int size[2]; // single batch size
@@ -266,9 +269,27 @@ void Tracker::test() {
 }
 
 void Tracker::init(float* img, int* roi) {
+	// roi: X,Y,H,W;
+	roi_ = roi;
+	// allocate_mem_space();
+	tmpl_ = get_feature(img);
+	prob_ = createGaussianPeak(H, W);
+
+	train(tmpl_, prob_, 1, 0.0005, s_);
 	return;
 }
 
 void Tracker::update(float* img) {
+	newfeat_ = get_feature(img);
+	float peak;
+	res = detect(tmpl_, newfeat_, &peak);
+
+	// adjust(res);
+	// x = get_feature(newlocation)
+	// train(x, factor)
+	return;
+}
+
+void Tracker::allocate_mem_space(int N, int C, int H, int W) {
 	return;
 }

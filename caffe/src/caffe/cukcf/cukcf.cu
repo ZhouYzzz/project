@@ -8,6 +8,30 @@
 #include "caffe/util/math_functions.hpp"
 namespace caffe {
 
+__global__ void add_C_kernel(const int n, const cuComplex* a,
+		const cuComplex* b, cuComplex* dst) {
+	CUDA_KERNEL_LOOP(index, n) {
+		dst[index] = cuCaddf(a[index], b[index]);
+	}
+}
+
+void caffe_add_mul_C(const int N, const cuComplex* a, const cuComplex* b,
+		cuComplex* dst) {
+	add_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, b, dst);
+}
+__global__ void sub_C_kernel(const int n, const cuComplex* a,
+		const cuComplex* b, cuComplex* dst) {
+	CUDA_KERNEL_LOOP(index, n) {
+		dst[index] = cuCsubf(a[index], b[index]);
+	}
+}
+
+void caffe_gpu_sub_C(const int N, const cuComplex* a, const cuComplex* b,
+		cuComplex* dst) {
+	sub_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, b, dst);
+}
 __global__ void mul_C_kernel(const int n, const cuComplex* a,
 		const cuComplex* b, cuComplex* dst) {
 	CUDA_KERNEL_LOOP(index, n) {
