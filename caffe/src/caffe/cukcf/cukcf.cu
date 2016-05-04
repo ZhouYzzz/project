@@ -8,16 +8,29 @@
 #include "caffe/util/math_functions.hpp"
 namespace caffe {
 
-__global__ void conj_mul_kernel(const int n, const cuComplex* a,
+__global__ void mul_C_kernel(const int n, const cuComplex* a,
+		const cuComplex* b, cuComplex* dst) {
+	CUDA_KERNEL_LOOP(index, n) {
+		dst[index] = cuCmulf(a[index], b[index]);
+	}
+}
+
+void caffe_gpu_mul_C(const int N, const cuComplex* a, const cuComplex* b,
+		cuComplex* dst) {
+	mul_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, b, dst);
+}
+
+__global__ void mul_cjC_kernel(const int n, const cuComplex* a,
 		const cuComplex* b, cuComplex* dst) {
 	CUDA_KERNEL_LOOP(index, n) {
 		dst[index] = cuCmulf(cuConjf(a[index]), b[index]);
 	}
 }
 
-void caffe_gpu_conj_mul(const int N, const cuComplex* a, const cuComplex* b,
+void caffe_gpu_mul_cjC(const int N, const cuComplex* a, const cuComplex* b,
 		cuComplex* dst) {
-	conj_mul_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+	mul_cjC_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
 			N, a, b, dst);
 }
 
@@ -34,15 +47,18 @@ void caffe_gpu_add_scalar_C(const int N, const cuComplex* a, const cuComplex alp
 			N, a, alpha, dst);
 }
 
+__global__ void div_C_kernel(const int n, const cuComplex* a,
+		const cuComplex* b, cuComplex* y) {
+	CUDA_KERNEL_LOOP(index, n) {
+		y[index] = cuCdivf(a[index], b[index]);
+	}
+}
 
-template <>
-void caffe_gpu_gemv<cuComplex>(const CBLAS_TRANSPOSE TransA, const int M,
-		const int N, const cuComplex alpha, const cuComplex* A, const cuComplex* x,
-		const cuComplex beta, cuComplex* y) {
-	cublasOperation_t cuTransA =
-		(TransA == CblasNoTrans) ? CUBLAS_OP_T : CUBLAS_OP_N;
-	CUBLAS_CHECK(cublasCgemv(Caffe::cublas_handle(), cuTransA, N, M, &alpha,
-		A, N, x, 1, &beta, y, 1));
+void caffe_gpu_div_C(const int N, const cuComplex* a,
+		const cuComplex* b, cuComplex* dst) {
+	// NOLINT_NEXT_LINE(whitespace/operators)
+	div_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, b, dst);
 }
 
 }

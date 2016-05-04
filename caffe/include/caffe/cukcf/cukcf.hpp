@@ -5,9 +5,17 @@
 #include "caffe/util/mkl_alternate.hpp"
 namespace caffe {
 
-void caffe_gpu_conj_mul(const int N, const cuComplex* a, const cuComplex* b,
+// a .* b
+void caffe_gpu_mul_C(const int N, const cuComplex* a, const cuComplex* b,
+		cuComplex* dst);
+
+// conj(a) .* b
+void caffe_gpu_mul_cjC(const int N, const cuComplex* a, const cuComplex* b,
 		cuComplex* dst);
 
 void caffe_gpu_add_scalar_C(const int N, const cuComplex* a, cuComplex alpha, 
+		cuComplex* dst);
+
+void caffe_gpu_div_C(const int N, const cuComplex* a, const cuComplex* b,
 		cuComplex* dst);
 }

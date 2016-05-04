@@ -64,15 +64,16 @@ public:
 		id = id;
 		std::cout << "init Tracker ...";
 
-		N=1;C=3;H=30;W=20;n=N*C*H*W; // init input shape
+		N=1;C=3;H=20;W=10;n=N*C*H*W; // init input shape
 		size[0]=W;size[1]=H;
 		
 		CUFFT_CHECK(cufftPlanMany(&plan, 2, size,
 			NULL, 1, H*W,
 			NULL, 1, H*W,
 			CUFFT_C2C, N*C)); // N*C batches of 2D metric of size H*W
+		CUFFT_CHECK(cufftPlan2d(&planS, H, W, CUFFT_C2C));
 
-		alphaf = initComplex(n);
+		alphaf = initComplex(H*W);
 		handle = Caffe::cublas_handle();
 
 		one_ = make_cuFloatComplex(1.0, 0.0);
@@ -93,6 +94,7 @@ public:
 		x1f_ = initComplex(n);
 		x2f_ = initComplex(n);
 		c_ = initComplex(n);
+		s_ = initComplex(H*W);
 
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
@@ -102,15 +104,13 @@ public:
 	}
 	void test(); // for development
 
-	void init(int* roi,float* img);
+	void init(float* img, int* roi);
 	void update(float* img);
 	// params
 
 protected:
-	//void train(float* img, float factor);
 	void train(cuComplex* x, cuComplex* y, float sigma, float lambda, cuComplex* dst);
-	//void detect(float* img);
-	void detect(cuComplex* alphaf, cuComplex* x, cuComplex* z, float sigma);
+	void detect(cuComplex* alphaf, cuComplex* x, cuComplex* z, float sigma, cuComplex* dst);
 
 	void linearCorrelation(cuComplex* xf1, cuComplex* xf2, cuComplex* k);
 
@@ -119,12 +119,14 @@ protected:
 	int size[2]; // single batch size
 	int roi[2];
 	cufftHandle plan; // fft plan
+	cufftHandle planS; // fft plan single batch
 	cuComplex* alphaf; // target model
 
 	cublasHandle_t handle; // handle
 
 	cudaEvent_t start,stop; // timer
 	float time;
+	float* resp;
 
 private:
 	cuComplex* ones_; // for sum purpose
@@ -140,11 +142,14 @@ private:
 	cuComplex* x1f_;
 	cuComplex* x2f_;
 	cuComplex* c_; // c = conj(x1f_) .* x2f_
+	cuComplex* s_;
 };
 
 int main(int argc, char** argv) {
 	//std::cout << "run cukcf" << std::endl;
 	caffe::GlobalInit(&argc, &argv);
+	Caffe::SetDevice(0);
+	Caffe::set_mode(Caffe::GPU);
 
 	std::cout << "=== cukcf ===" << std::endl;
 	Tracker tracker(1);
@@ -183,7 +188,7 @@ int main(int argc, char** argv) {
 }
 
 void Tracker::linearCorrelation(cuComplex* src1, cuComplex* src2, cuComplex* dst) {
-	std::cout << "[tracker] linear correlation." << std::endl;
+	//std::cout << "[tracker] linear correlation." << std::endl;
 
 	CUFFT_CHECK(cufftExecC2C(plan, src1, src1, CUFFT_FORWARD));	// fft on x1, inplace
 	cudaDeviceSynchronize();
@@ -191,7 +196,7 @@ void Tracker::linearCorrelation(cuComplex* src1, cuComplex* src2, cuComplex* dst
 	CUFFT_CHECK(cufftExecC2C(plan, src2, src2, CUFFT_FORWARD));	// fft on x2, inplace
 	cudaDeviceSynchronize();
 	
-	caffe::caffe_gpu_conj_mul(n, src1, src2, c_);				// c = conj(x1) .* x2, ref.
+	caffe::caffe_gpu_mul_cjC(n, src1, src2, c_);				// c = conj(x1) .* x2, ref.
 	cudaDeviceSynchronize();
 	
 	CUBLAS_CHECK(cublasCgemv(
@@ -217,18 +222,53 @@ void Tracker::train(cuComplex* x, cuComplex* y, float sigma, float lambda, cuCom
 	//	   alphaf = fft2(y) ./ (fft2(k) + lambda);
 	// }
 	linearCorrelation(x, x, kf_);
-	CUFFT_CHECK(cufftExecC2C(plan, y, y, CUFFT_FORWARD)); // fft2(y)
-	CUFFT_CHECK(cufftExecC2C(plan, kf_, kf_, CUFFT_FORWARD)); // fft2(k)
-	caffe::caffe_gpu_add_scalar_C(n, kf_, make_cuFloatComplex(lambda, 0.0), dst);
+	CUFFT_CHECK(cufftExecC2C(planS, y, y, CUFFT_FORWARD)); // fft2(y)
+	CUFFT_CHECK(cufftExecC2C(planS, kf_, kf_, CUFFT_FORWARD)); // fft2(k) single batch [NOTICE] may change
+	caffe::caffe_gpu_add_scalar_C(H*W, kf_, make_cuFloatComplex(lambda, 0.0), s_); // s_ = fft2(k) + lambda
+	caffe::caffe_gpu_div_C(H*W, y, s_, dst); // dst = fft2(y) ./ ( fft2(k) + lambda )
+}
+
+void Tracker::detect(cuComplex* alpha, cuComplex* x, cuComplex* z, float sigma, cuComplex* dst) {
+	// function responses = detect(alphaf, x, z, sigma) 
+	//     k = kernel_correlation(z, x, sigma);
+	//     responses = real(ifft2(alphaf .* fft2(k)));
+	// end
+	linearCorrelation(z, x, kf_);
+
+	CUFFT_CHECK(cufftExecC2C(planS, kf_, kf_, CUFFT_FORWARD)); // fft2(k)
+	caffe::caffe_gpu_mul_C(H*W, kf_, alpha, s_); // s_ = fft2(k) .* alpha
+	CUFFT_CHECK(cufftExecC2C(planS, alpha, s_, CUFFT_INVERSE)); // ifft2(s_)
 	
+	//resp =  complexToReal(s_, H*W, false);
 }
 
 void Tracker::test() {
+	//	xf_ = initComplex(n);
+	//	yf_ = initComplex(H*W);
+	//	zf_ = initComplex(n);
+	//	kf_ = initComplex(H*W);
+    //
+	//	x1f_ = initComplex(n);
+	//	x2f_ = initComplex(n);
+	//	c_ = initComplex(n);
+	//	s_ = initComplex(H*W);
 	tic;
-	linearCorrelation(xf_, yf_, kf_);
+	train(xf_, yf_, 0, 0, alphaf);
 	toc;
-	std::cout << "[test] " << time << " ms" << std::endl;
-
+	std::cout << "[test train] " << time << " ms" << std::endl;
+	
+	tic;
+	detect(alphaf, zf_, xf_, 0, s_);
+	toc;
+	std::cout << "[test detect] " << time << " ms" << std::endl;
 	std::cout << "[test] successful." << std::endl;
+	return;
+}
+
+void Tracker::init(float* img, int* roi) {
+	return;
+}
+
+void Tracker::update(float* img) {
 	return;
 }
