@@ -1,19 +1,22 @@
-#include "caffe/cukcf/cukcf.hpp"
-
 #include <gflags/gflags.h>
 
 #include <vector>
 
 #include "caffe/caffe.hpp"
 #include "cufft.h"
-
-#include "caffe/util/device_alternate.hpp"
-#include "caffe/util/mkl_alternate.hpp"
+#include "caffe/cukcf/cukcf.hpp"
 
 #define tic cudaEventRecord(start, 0);
 #define toc cudaEventRecord(stop, 0); \
 	cudaEventSynchronize(stop); \
 	cudaEventElapsedTime(&time,start,stop);
+
+
+using caffe::Net;
+using caffe::Caffe;
+using caffe::Blob;
+using caffe::vector;
+DEFINE_string(model, "", "help");
 
 #define CUFFT_CHECK(condition) \
 	do { \

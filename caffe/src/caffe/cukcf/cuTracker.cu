@@ -4,9 +4,21 @@
 #include <thrust/reduce.h>
 
 #include "caffe/common.hpp"
-#include "caffe/cukcf/cukcf.hpp"
+#include "caffe/cukcf/cuTracker.hpp"
 #include "caffe/util/math_functions.hpp"
 namespace caffe {
+
+__global__ void real_C_kernel(const int n, const cuComplex* a, float* dst) {
+	CUDA_KERNEL_LOOP(index, n) {
+		dst[index] = cuCrealf(a[index]);
+	}
+}
+
+void caffe_gpu_real_C(const int N, const cuComplex* a, float* dst) {
+	real_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, dst);
+}
+
 
 __global__ void add_C_kernel(const int n, const cuComplex* a,
 		const cuComplex* b, cuComplex* dst) {
