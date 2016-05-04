@@ -7,6 +7,7 @@
 #include "caffe/cukcf/cuTracker.hpp"
 #include "caffe/util/math_functions.hpp"
 namespace caffe {
+
 __global__ void set_C_kernel(const int n, const cuComplex alpha, cuComplex* dst) {
 	CUDA_KERNEL_LOOP(index, n) {
 		dst[index] = alpha;
@@ -14,7 +15,7 @@ __global__ void set_C_kernel(const int n, const cuComplex alpha, cuComplex* dst)
 }
 
 void caffe_gpu_set_C(const int N, const cuComplex alpha, cuComplex* dst) {
-	real_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+	set_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
 			N, alpha, dst);
 }
 

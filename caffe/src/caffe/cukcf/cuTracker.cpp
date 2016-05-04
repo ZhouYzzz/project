@@ -10,7 +10,7 @@
 #include "caffe/util/device_alternate.hpp"
 #include "caffe/util/mkl_alternate.hpp"
 
-using caffe::Caffe
+using caffe::Caffe;
 
 #define CUFFT_CHECK(condition) \
 	do { \
@@ -20,14 +20,10 @@ using caffe::Caffe
 	} while (0)
 
 cuTracker::cuTracker() {
-	lambda = make_cuFloatComplex(0.0001, 0);
-	interp_factor = 0.01;
-	interp_factor_C = make_cuFloatComplex(interp_factor, 0);
-	onemin_factor = 1 - interp_factor;
-}
-
-cuTracker::~cuTracker() {
-
+	//lambda = make_cuFloatComplex(0.0001, 0);
+	//interp_factor = 0.01;
+	//interp_factor_C = make_cuFloatComplex(interp_factor, 0);
+	//onemin_factor = 1 - interp_factor;
 }
 
 void cuTracker::init(const cv::Rect &roi, cv::Mat image) {
@@ -47,6 +43,7 @@ void cuTracker::cnnLoad() {
 }
 
 void cuTracker::allocate_memory_space() {
+	using namespace caffe;
 	// constants
 	one_ = make_cuFloatComplex(1.0, 0.0);
 	zero_ = make_cuFloatComplex(0.0, 0.0);
@@ -75,7 +72,7 @@ void cuTracker::allocate_memory_space() {
 }
 
 void cuTracker::init_cuda_handle() {
-	int[2] shape = {W, H};
+	int shape[2] = {W, H};
 	handle_ = Caffe::cublas_handle();
 	CUFFT_CHECK(cufftPlanMany(&planm_, 2, shape,
 			NULL, 1, H*W,

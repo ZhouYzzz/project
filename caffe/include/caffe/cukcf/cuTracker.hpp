@@ -8,7 +8,7 @@ using caffe::Net;
 class cuTracker {
 	public:
 		cuTracker();
-		~cuTracker();
+		~cuTracker() {}
 
 		// Initalize tracker
 		virtual void init(const cv::Rect &roi, cv::Mat image);
@@ -73,7 +73,7 @@ class cuTracker {
 		cuComplex one_;
 		cuComplex* ones_; // length: 1*H*W, for sum operation
 		cuComplex zero_;
-		cuComplex null_;
+		cuComplex* null_;
 
 		float* resp_; // detect response
 
@@ -99,6 +99,7 @@ class cuTracker {
 
 // help functions for complex
 namespace caffe {
+
 // set
 void caffe_gpu_set_C(const int N, const cuComplex alpha, cuComplex* dst);
 // real(a)
