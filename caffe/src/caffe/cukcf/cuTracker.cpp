@@ -29,18 +29,26 @@ void cuTracker::init(const cv::Rect &roi, cv::Mat image) {
 	return;
 }
 
-cv::Rect cuTracker::update(cv::Mat image);
+cv::Rect cuTracker::update(cv::Mat image) {
+	return cv::Rect();
+}
 
 void cuTracker::cnnLoad() {
 	// load cnn from prototxt
 	return;
 }
 
-void cuTracker::allocate_memory_space();
+void cuTracker::allocate_memory_space() {
+	return;
+}
 
-void cuTracker::init_cuda_handle();
+void cuTracker::init_cuda_handle() {
+	return;
+}
 
-void cuTracker::getFeature(const cv::Mat image, cuComplex* dst);
+void cuTracker::getFeature(const cv::Mat image, cuComplex* dst) {
+	return;
+}
 
 void cuTracker::train(const cuComplex* x) { // interp_factor
 	using namespace caffe;
@@ -52,9 +60,9 @@ void cuTracker::train(const cuComplex* x) { // interp_factor
 
 	CUBLAS_CHECK(cublasCsscal(handle_, N, &onemin_factor, tmpl_, 1)); // scale by (1-factor)
 	CUBLAS_CHECK(cublasCsscal(handle_, H*W,&onemin_factor, alphaf_, 1)); // scale by (1-factor)
-	CUBLAS_CHECK(cublasCaxpy(handle_, N, &interp_factor,
-				const_cast<cuComplex*>x, 1, tmpl_, 1)); // tmpl_ += factor * x
-	CUBLAS_CHECK(cublasCaxpy(handle_, H*W, &interp_factor,
+	CUBLAS_CHECK(cublasCaxpy(handle_, N, &interp_factor_C,
+				const_cast<cuComplex*>(x), 1, tmpl_, 1)); // tmpl_ += factor * x
+	CUBLAS_CHECK(cublasCaxpy(handle_, H*W, &interp_factor_C,
 				ts3_, 1, alphaf_, 1)); // alphaf_ += factor * alphaf
 }
 

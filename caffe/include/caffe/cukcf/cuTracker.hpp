@@ -1,6 +1,9 @@
-#include "caffe/common.hpp"
+#include "caffe/caffe.hpp"
 #include "cuComplex.h"
+#include "cufft.h"
 #include <opencv2/opencv.hpp>
+
+using caffe::Net;
 
 class cuTracker {
 	public:
@@ -48,15 +51,16 @@ class cuTracker {
 		//	   dst: 1*H*W
 		void linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst);
 
-		caffe::Net cnn;
+		Net<float> cnn(char**, int);
 
 		// constants
 		cuComplex lambda;
 		float interp_factor;
+		cuComplex interp_factor_C;
 		float onemin_factor; // 1 - interp_factor
 
 		// operation shape
-		int C, int H, int W;
+		int C, H, W;
 		int N; // N = C * H * W
 
 	private:
@@ -67,7 +71,7 @@ class cuTracker {
 
 		// constants
 		cuComplex one_;
-		cuComplex ones_; // length: 1*H*W, for sum operation
+		cuComplex* ones_; // length: 1*H*W, for sum operation
 		cuComplex zero_;
 
 		float* resp_; // detect response
