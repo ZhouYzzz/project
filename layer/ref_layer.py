@@ -14,12 +14,12 @@ class RefLayer(caffe.Layer):
     def reshape(self, bottom, top):
         #print 'NONONO'
         #top[0].reshape(*self.test_data.shape)
-        top[0].reshape(1,3,60,60)
+        top[0].reshape(1,1,1,4)
         pass
 
     def forward(self, bottom, top):
         #top[0].data[...] = self.test_data
-        top[0].data[...] = np.random.random([1,3,60,60])
+        top[0].data[...] = np.arange(4).reshape(1,1,1,4);
         # print 'Nothing with this'
         pass
 
