@@ -18,9 +18,10 @@ using std::string;
 		<< result; \
 	} while (0)
 
-cuTracker::cuTracker(string model, string weights) {
+cuTracker::cuTracker(string model, string weights) 
+	: cnn(cnnInitCheck(model, weights), caffe::TEST) {
 	init_constants();
-	cnnLoad(model, weights);
+	cnnLoad(weights);
 }
 
 void cuTracker::init(const cv::Rect &roi, cv::Mat image) {
@@ -34,10 +35,12 @@ cv::Rect cuTracker::update(cv::Mat image) {
 	return cv::Rect();
 }
 
-void cuTracker::cnnLoad(string model, string weights) {
+string cuTracker::cnnInitCheck(string model, string weights) {
 	CHECK_GT(model.size(), 0) << "Need a model definition.";
-	CHECK_GT(model.size(), 0) << "Need model weights.";
-	cnn = caffe_net(model, caffe::TEST);
+	CHECK_GT(weights.size(), 0) << "Need model weights.";
+	return model;
+}
+void cuTracker::cnnLoad(string weights) {
 	cnn.CopyTrainedLayersFrom(weights);
 }
 

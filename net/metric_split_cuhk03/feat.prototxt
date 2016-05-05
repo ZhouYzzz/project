@@ -1,0 +1,56 @@
+name: "metric_split_cuhk03"
+input: "data"
+  input_shape {
+    dim: 1
+    dim: 3
+    dim: 240
+    dim: 120
+  }
+
+# anchor/0/conv1
+  layer {
+    name: "anchor/0/conv1"
+    type: "Convolution"
+    bottom: "data"
+    top: "anchor/0/conv1"
+    param {
+      name: "/conv1"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    param {
+      name: "/conv1_b"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    convolution_param {
+      num_output: 64
+      kernel_size: 5
+      stride: 2
+      weight_filler {
+        type: "gaussian"
+        std: 0.01
+      }
+      bias_filler {
+        type: "constant"
+        value: 0
+      }
+    }
+  }
+  layer {
+    name: "anchor/0/relu1"
+    type: "ReLU"
+    bottom: "anchor/0/conv1"
+    top: "feat"
+  }
+#   layer {
+#     name: "anchor/0/pool1"
+#     type: "Pooling"
+#     bottom: "anchor/0/conv1"
+#     top: "anchor/0/pool1"
+#     pooling_param {
+#       pool: MAX
+#       kernel_size: 2
+#       stride: 2
+#     }
+#   }
