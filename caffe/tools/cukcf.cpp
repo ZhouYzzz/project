@@ -1,3 +1,6 @@
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+
 #include "caffe/caffe.hpp"
 #include "caffe/cukcf/cuTracker.hpp"
 
@@ -10,12 +13,16 @@ using caffe::Caffe;
 
 int main(int argc, char** argv)
 {
-    // FLAGS_alsologtostderr = 1;
+    FLAGS_alsologtostderr = 1;
 
     caffe::GlobalInit(&argc, &argv);
     Caffe::set_mode(Caffe::GPU);
-    Caffe::SetDevice(0);
+    Caffe::SetDevice(2);
 
 	cuTracker tracker(FLAGS_model, FLAGS_weights);
+	LOG(INFO) << "construct tracker done.";
+	
+	LOG(INFO) << tracker.cnn.input_blobs()[0]->count();
+	LOG(INFO) << tracker.cnn.input_blobs()[0]->mutable_gpu_data();
 	return 0;
 }

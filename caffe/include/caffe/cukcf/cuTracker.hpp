@@ -17,6 +17,7 @@ class cuTracker {
 		// Update position based on the new frame
 		virtual cv::Rect update(cv::Mat image);
 
+		Net<float> cnn;
 	protected:
 		string cnnInitCheck(string model, string weights);
 		void cnnLoad(string weights);
@@ -55,7 +56,6 @@ class cuTracker {
 		//	   dst: 1*H*W
 		void linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst);
 
-		Net<float> cnn;
 
 		// constants
 		cuComplex lambda;
