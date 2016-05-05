@@ -3,7 +3,7 @@
 #include "cufft.h"
 #include <opencv2/opencv.hpp>
 
-using caffe::Net;
+// using caffe::Net;
 
 class cuTracker {
 	public:
@@ -51,7 +51,7 @@ class cuTracker {
 		//	   dst: 1*H*W
 		void linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst);
 
-		Net<float> cnn(char**, int);
+		//Net<float> cnn(char**, int);
 
 		// constants
 		cuComplex lambda;
@@ -95,31 +95,3 @@ class cuTracker {
 		cuComplex* ts2_;
 		cuComplex* ts3_;
 };
-
-
-// help functions for complex
-namespace caffe {
-
-// set
-void caffe_gpu_set_C(const int N, const cuComplex alpha, cuComplex* dst);
-// real(a)
-void caffe_gpu_real_C(const int N, const cuComplex* a, float* dst);
-// a .+ b
-void caffe_gpu_add_C(const int N, const cuComplex* a, const cuComplex* b,
-		cuComplex* dst);
-// a .- b
-void caffe_gpu_sub_C(const int N, const cuComplex* a, const cuComplex* b,
-		cuComplex* dst);
-// a .* b
-void caffe_gpu_mul_C(const int N, const cuComplex* a, const cuComplex* b,
-		cuComplex* dst);
-// conj(a) .* b
-void caffe_gpu_mul_cjC(const int N, const cuComplex* a, const cuComplex* b,
-		cuComplex* dst);
-// a + c
-void caffe_gpu_add_scalar_C(const int N, const cuComplex* a, cuComplex alpha, 
-		cuComplex* dst);
-// a ./ b
-void caffe_gpu_div_C(const int N, const cuComplex* a, const cuComplex* b,
-		cuComplex* dst);
-}

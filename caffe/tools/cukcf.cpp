@@ -3,6 +3,6 @@
 
 int main(int argc, char** argv)
 {
-	/* code */
+	cuTracker tracker();
 	return 0;
 }

@@ -1,33 +1,64 @@
-#include <algorithm>
-#include <iostream>
-#include "cukcf.hpp"
+#include <math_functions.h>
+#include <thrust/device_vector.h>
+#include <thrust/functional.h>  // thrust::plus
+#include <thrust/reduce.h>
 
-#include "cuComplex.h"
-#include "cufft.h"
+#include "caffe/common.hpp"
+#include "caffe/cukcf/cukcf.hpp"
+#include "caffe/util/math_functions.hpp"
+namespace caffe {
 
-namespace CUKCF {
-
-
+__global__ void mul_C_kernel(const int n, const cuComplex* a,
+		const cuComplex* b, cuComplex* dst) {
+	CUDA_KERNEL_LOOP(index, n) {
+		dst[index] = cuCmulf(a[index], b[index]);
+	}
 }
 
-#define NX 8
-#define BATCH 1
+void caffe_gpu_mul_C(const int N, const cuComplex* a, const cuComplex* b,
+		cuComplex* dst) {
+	mul_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, b, dst);
+}
 
-int main() {
-  //std::cout << 0;
-  cuComplex c;
-  c = make_cuComplex(1.0, 0.0);
+__global__ void mul_cjC_kernel(const int n, const cuComplex* a,
+		const cuComplex* b, cuComplex* dst) {
+	CUDA_KERNEL_LOOP(index, n) {
+		dst[index] = cuCmulf(cuConjf(a[index]), b[index]);
+	}
+}
 
-  cufftHandle plan;
-  cufftComplex *data;
-  cudaMalloc((void**)&data, sizeof(cufftComplex)*NX*BATCH);
-//  std::cout << 1;
-  data[0] = c;
-//  std::cout << 2;
-//  cufftPlan1d(&plan, NX, CUFFT_C2C, BATCH);
-//  std::cout << 3;
-//  cufftExecC2C(plan, data, data, CUFFT_FORWARD);
-//  std::cout << 4;
-  std::cout << "Hello, cuda." << c.x << std::endl;
-  return 0;
+void caffe_gpu_mul_cjC(const int N, const cuComplex* a, const cuComplex* b,
+		cuComplex* dst) {
+	mul_cjC_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, b, dst);
+}
+
+__global__ void add_scalar_C_kernel(const int n, const cuComplex* a,
+		const cuComplex alpha, cuComplex* dst) {
+	CUDA_KERNEL_LOOP(index, n) {
+		dst[index] = cuCaddf(a[index], alpha);
+	}
+}
+
+void caffe_gpu_add_scalar_C(const int N, const cuComplex* a, const cuComplex alpha, 
+		cuComplex* dst) {
+	add_scalar_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, alpha, dst);
+}
+
+__global__ void div_C_kernel(const int n, const cuComplex* a,
+		const cuComplex* b, cuComplex* y) {
+	CUDA_KERNEL_LOOP(index, n) {
+		y[index] = cuCdivf(a[index], b[index]);
+	}
+}
+
+void caffe_gpu_div_C(const int N, const cuComplex* a,
+		const cuComplex* b, cuComplex* dst) {
+	// NOLINT_NEXT_LINE(whitespace/operators)
+	div_C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(
+			N, a, b, dst);
+}
+
 }

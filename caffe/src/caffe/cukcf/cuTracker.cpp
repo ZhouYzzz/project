@@ -9,6 +9,7 @@
 
 #include "caffe/util/device_alternate.hpp"
 #include "caffe/util/mkl_alternate.hpp"
+#include "caffe/util/math_functions.hpp"
 
 using caffe::Caffe;
 
