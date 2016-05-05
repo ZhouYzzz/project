@@ -12,7 +12,7 @@ class cuTracker {
 		~cuTracker() {}
 
 		// Initalize tracker
-		virtual void init(const cv::Rect &roi, cv::Mat image);
+		virtual void init(const cv::Rect &roi, const cv::Mat image);
 
 		// Update position based on the new frame
 		virtual cv::Rect update(cv::Mat image);
@@ -27,6 +27,8 @@ class cuTracker {
 		void init_cuda_handle();
 
 		void init_constants();
+
+		cv::Rect cuTracker::getwindow(const cv::Rect roi);
 
 		// input:
 		//     image: vedio frame
@@ -56,6 +58,8 @@ class cuTracker {
 		//	   dst: 1*H*W
 		void linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst);
 
+		// region of interests
+		cv::Rect roi_;
 
 		// constants
 		cuComplex lambda;
@@ -83,9 +87,11 @@ class cuTracker {
 
 		// cuda protected mem space
 		// multi-channel
+		cuComplex* feat_; // feature extracted
 		cuComplex* tmpl_; // target template
 
 		// single-channel
+		cuComplex* hann_; // hanning window
 		cuComplex* alphaf_; // target model in F domain
 		cuComplex* k_;
 		cuComplex* prob_; // score

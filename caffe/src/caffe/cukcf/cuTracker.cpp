@@ -11,6 +11,16 @@ using caffe::Caffe;
 using caffe::Net;
 using std::string;
 
+void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
+	if (fromdevice) {
+		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(cuComplex), src, 
+			sizeof(float), sizeof(float), n, cudaMemcpyDeviceToDevice));
+	}else{
+		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(cuComplex), src, 
+			sizeof(float), sizeof(float), n, cudaMemcpyHostToDevice));	
+	}
+}
+
 #define CUFFT_CHECK(condition) \
 	do { \
 		cufftResult result = condition; \
@@ -24,14 +34,40 @@ cuTracker::cuTracker(string model, string weights)
 	cnnLoad(weights);
 }
 
-void cuTracker::init(const cv::Rect &roi, cv::Mat image) {
-	C = 3; H = 40; W = 30; N = C * H * W;
+void cuTracker::init(const cv::Rect &roi, const cv::Mat image) {
+	pad = 2; // window size / roi size, constant
+
+	img_H = image.rows; img_W = image.cols; 	// frame size
+	roi_H = roi.height; roi_W = roi.width;		// roi size
+	win_H = pad * roi_H; win_W = pad * roi_W; 	// window size
+
+	// reshape, calculate feature size, get C, H, W
+	cnn.input_blobs()[0]->Reshape(1,3,win_H,win_W);
+	cnn.Reshape();
+	Blob<float>* output = cnn.output_blobs()[0];
+	C = output->channels();
+	H = output->height();
+	W = output->width();
+	N = C * H * W;
+
 	init_cuda_handle();
 	allocate_memory_space();
-	return;
+
+	initHanning();
+	initGaussian();
+
+	getFeature(image); // to feat_ (cuComplex*)
+
+	init_constants(1);
+	train(feat_);
+	init_constants(0.01);
 }
 
 cv::Rect cuTracker::update(cv::Mat image) {
+	detect();
+	update_location();
+	getFeature();
+	train();
 	return cv::Rect();
 }
 
@@ -58,6 +94,7 @@ void cuTracker::allocate_memory_space() {
 
 	// specified mem space
 	CUDA_CHECK(cudaMalloc((void**)&tmpl_, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&feat_, sizeof(cuComplex)*N));
 
 	CUDA_CHECK(cudaMalloc((void**)&alphaf_, sizeof(cuComplex)*H*W));
 	CUDA_CHECK(cudaMalloc((void**)&k_, sizeof(cuComplex)*H*W));
@@ -83,24 +120,70 @@ void cuTracker::init_cuda_handle() {
 	CUFFT_CHECK(cufftPlan2d(&plans_, H, W, CUFFT_C2C));
 }
 
-void cuTracker::init_constants() {
+void cuTracker::init_constants(float interp) {
 	lambda = make_cuFloatComplex(0.0001, 0);
-	interp_factor = 0.01;
+	interp_factor = interp;
 	interp_factor_C = make_cuFloatComplex(interp_factor, 0);
 	onemin_factor = 1 - interp_factor;
 }
 
-void cuTracker::getFeature(const cv::Mat image, cuComplex* dst) {
-	return;
+void cuTracker::initHanning() {
+	cv::Mat hann;
+	cv::createHanningWindow(hann, cv::Size(H, W), CV_32F);
+	CUDA_CHECK(cudaMemcpy(hann_, hann.data, H*W, cudaMemcpyHostToDevice));
+}
+
+void cuTracker::initGuassian() {
+    cv::Mat_<float> res(H, W);
+
+    int syh = (H) / 2;
+    int sxh = (W) / 2;
+
+    float output_sigma = std::sqrt((float) H * W) / padding * output_sigma_factor;
+    float mult = -0.5 / (output_sigma * output_sigma);
+
+    for (int i = 0; i < H; i++)
+        for (int j = 0; j < W; j++)
+        {
+            int ih = i - syh;
+            int jh = j - sxh;
+            res(i, j) = std::exp(mult * (float) (ih * ih + jh * jh));
+        }
+    CUDA_CHECK(cudaMemcpy(prob_, res.data, H*W, cudaMemcpyHostToDevice));
+    CUFFT_CHECK(cufftExecC2C(plans_, prob_, prob_, CUFFT_FORWARD)); // fft2(prob_) probf
+}
+
+cv::Rect cuTracker::getwindow(const cv::Rect roi) {
+	pad = 2;
+	float cx = roi.x + roi.width / 2;
+    float cy = roi.y + roi.height / 2;
+    cv::Rect window;
+    window.width = pad*roi.width;
+    window.height = pad*roi.height;
+    window.x = cx - window.width / 2;
+    window.y = cy - window.height / 2;
+	return window;
+}
+
+void cuTracker::getFeature(const cv::Mat image) { // to feat_
+	cv::Rect window = getwindow(roi_);
+	cv::Mat z = RectTools::subwindow(image, window, cv::BORDER_REPLICATE);
+	CUDA_CHECK(cudaMemcpy(cnn.input_blobs()[0]->mutable_gpu_data(), 
+			z.data, sizeof(float) * win_H * win_W, cudaMemcpyHostToDevice));
+	cnn.Forward();
+	realToComplex(cnn.output_blobs()[0]->mutable_gpu_data(), N, feat_, true);
+
+	// multi hanning window
+	// !!!
 }
 
 void cuTracker::train(const cuComplex* x) { // interp_factor
 	using namespace caffe;
 	linearCorrelation(x, x, k_); // [note] fft(x) can only perform once
-	CUFFT_CHECK(cufftExecC2C(plans_, prob_, ts1_, CUFFT_FORWARD)); // ts1_ = fft2(y)
+	// CUFFT_CHECK(cufftExecC2C(plans_, prob_, ts1_, CUFFT_FORWARD)); // ts1_ = fft2(y)
 	CUFFT_CHECK(cufftExecC2C(plans_, k_, k_, CUFFT_FORWARD)); // k_ = fft2(k_)
 	caffe_gpu_add_scalar_C(H*W, k_, lambda, ts2_); // ts2_ = fft2(k) + lambda
-	caffe_gpu_div_C(H*W, ts1_, ts2_, ts3_);	// alphaf = ts3_ = ts1_ / ts_2
+	caffe_gpu_div_C(H*W, prob_, ts2_, ts3_);	// alphaf = ts3_ = probf / ts_2
 
 	CUBLAS_CHECK(cublasCsscal(handle_, N, &onemin_factor, tmpl_, 1)); // scale by (1-factor)
 	CUBLAS_CHECK(cublasCsscal(handle_, H*W,&onemin_factor, alphaf_, 1)); // scale by (1-factor)
