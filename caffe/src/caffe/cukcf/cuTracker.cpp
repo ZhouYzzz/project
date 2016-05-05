@@ -1,17 +1,15 @@
 #include "caffe/cukcf/cuTracker.hpp"
 
-#include <gflags/gflags.h>
-
 #include <vector>
 
 #include "caffe/caffe.hpp"
-#include "cufft.h"
-
 #include "caffe/util/device_alternate.hpp"
 #include "caffe/util/mkl_alternate.hpp"
 #include "caffe/util/math_functions.hpp"
 
 using caffe::Caffe;
+using caffe::Net;
+using std::string;
 
 #define CUFFT_CHECK(condition) \
 	do { \
@@ -20,11 +18,9 @@ using caffe::Caffe;
 		<< result; \
 	} while (0)
 
-cuTracker::cuTracker() {
-	//lambda = make_cuFloatComplex(0.0001, 0);
-	//interp_factor = 0.01;
-	//interp_factor_C = make_cuFloatComplex(interp_factor, 0);
-	//onemin_factor = 1 - interp_factor;
+cuTracker::cuTracker(string model, string weights) {
+	init_constants();
+	cnnLoad(model, weights);
 }
 
 void cuTracker::init(const cv::Rect &roi, cv::Mat image) {
@@ -38,9 +34,11 @@ cv::Rect cuTracker::update(cv::Mat image) {
 	return cv::Rect();
 }
 
-void cuTracker::cnnLoad() {
-	// load cnn from prototxt
-	return;
+void cuTracker::cnnLoad(string model, string weights) {
+	CHECK_GT(model.size(), 0) << "Need a model definition.";
+	CHECK_GT(model.size(), 0) << "Need model weights.";
+	cnn = caffe_net(model, caffe::TEST);
+	cnn.CopyTrainedLayersFrom(weights);
 }
 
 void cuTracker::allocate_memory_space() {
@@ -80,6 +78,13 @@ void cuTracker::init_cuda_handle() {
 			NULL, 1, H*W,
 			CUFFT_C2C, N)); // N*C batches of 2D metric of size H*W
 	CUFFT_CHECK(cufftPlan2d(&plans_, H, W, CUFFT_C2C));
+}
+
+void cuTracker::init_constants() {
+	lambda = make_cuFloatComplex(0.0001, 0);
+	interp_factor = 0.01;
+	interp_factor_C = make_cuFloatComplex(interp_factor, 0);
+	onemin_factor = 1 - interp_factor;
 }
 
 void cuTracker::getFeature(const cv::Mat image, cuComplex* dst) {

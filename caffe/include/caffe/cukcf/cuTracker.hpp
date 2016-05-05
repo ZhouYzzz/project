@@ -3,11 +3,12 @@
 #include "cufft.h"
 #include <opencv2/opencv.hpp>
 
-// using caffe::Net;
+using caffe::Net;
+using std::string;
 
 class cuTracker {
 	public:
-		cuTracker();
+		cuTracker(string model, string weights);
 		~cuTracker() {}
 
 		// Initalize tracker
@@ -22,6 +23,8 @@ class cuTracker {
 		void allocate_memory_space();
 
 		void init_cuda_handle();
+
+		void init_constants();
 
 		// input:
 		//     image: vedio frame
@@ -51,7 +54,7 @@ class cuTracker {
 		//	   dst: 1*H*W
 		void linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst);
 
-		//Net<float> cnn(char**, int);
+		Net<float> cnn(string, int);
 
 		// constants
 		cuComplex lambda;
