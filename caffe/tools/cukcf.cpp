@@ -3,6 +3,7 @@
 
 #include "caffe/caffe.hpp"
 #include "caffe/cukcf/cuTracker.hpp"
+#include "caffe/cukcf/kcftracker.hpp"
 
 #include "opencv2/opencv.hpp"
 
@@ -20,9 +21,9 @@ int main(int argc, char** argv)
 
     caffe::GlobalInit(&argc, &argv);
     Caffe::set_mode(Caffe::GPU);
-    Caffe::SetDevice(2);
+    Caffe::SetDevice(1);
 
-	// cuTracker tracker(FLAGS_model, FLAGS_weights);
+	//cuTracker tracker(FLAGS_model, FLAGS_weights);
 	LOG(INFO) << "construct tracker done.";
 	
 	// LOG(INFO) << tracker.cnn.input_blobs()[0]->count();
@@ -30,5 +31,9 @@ int main(int argc, char** argv)
 
 	Mat im = imread("database/cuhk03/labeled/0001_01.jpg", CV_LOAD_IMAGE_COLOR);
 	LOG(INFO) << im.rows << " * " << im.cols;
+
+	KCFTracker tracker(true,true,true,true);
+	tracker.init(Rect(0,0,10,10), im);
+	LOG(INFO) << tracker.update(im);
 	return 0;
 }
