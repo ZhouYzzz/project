@@ -198,7 +198,7 @@ void KCFTracker::allocate() {
 	caffe_gpu_set_C(C, one_, ones_);
 
 	CUDA_CHECK(cudaMalloc((void**)&conv_feature, sizeof(cuComplex)*N));
-
+	CUDA_CHECK(cudaMalloc((void**)&hann_window, sizeof(cuComplex)*N));
 	CUDA_CHECK(cudaMalloc((void**)&k, sizeof(cuComplex)*H*W));
 
 	CUDA_CHECK(cudaMalloc((void**)&tm1_, sizeof(cuComplex)*N));
@@ -225,9 +225,9 @@ void KCFTracker::init(const cv::Rect &roi, cv::Mat image)
     _roi = roi;
     assert(roi.width >= 0 && roi.height >= 0);
     _tmpl = getFeatures(image, 1);
-	tic;
-	init_fft_plan();
-	toc("init_fft_plan");
+
+	tic; init_fft_plan(); toc("init_fft_plan");
+
     _prob = createGaussianPeak(size_patch[0], size_patch[1]);
     _alphaf = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     //_num = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
@@ -328,7 +328,9 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
     using namespace FFTTools;
 
 	if (CONV_FEAT) {
+		tic;
 		linearCorrelation(conv_feature, conv_feature, k);
+		toc("l cor");
 	}
 
     cv::Mat k = gaussianCorrelation(x, x);
@@ -352,7 +354,6 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
 
 void KCFTracker::linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst) {
 	using namespace caffe;
-	tic;
 	CUFFT_CHECK(cufftExecC2C(planm_, const_cast<cuComplex*>(a), tm1_, CUFFT_FORWARD));
 	CUDA_CHECK(cudaDeviceSynchronize());
 	CUFFT_CHECK(cufftExecC2C(planm_, const_cast<cuComplex*>(b), tm2_, CUFFT_FORWARD));
@@ -367,7 +368,6 @@ void KCFTracker::linearCorrelation(const cuComplex* a, const cuComplex* b, cuCom
 			dst, 1));
 	CUFFT_CHECK(cufftExecC2C(plans_, dst, dst, CUFFT_INVERSE));
 	CUDA_CHECK(cudaDeviceSynchronize());
-	toc("linear correlation");
 }
 
 // Evaluates a Gaussian kernel with bandwidth SIGMA for all relative shifts between input images X and Y, which must both be MxN. They must    also be periodic (ie., pre-processed with a cosine window).
@@ -493,26 +493,32 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
     // TODO: CONV features
 	// void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
     if (CONV_FEAT) {
-		tic;
+		//tic;
 		cnn.input_blobs()[0]->Reshape(1, z.channels(), z.rows, z.cols);
+		// cnn.Reshape();
         trans.Transform(z, cnn.input_blobs()[0]);
-		toc("input"); tic;
+		// toc("input"); tic;
 		cnn.Forward();
-		toc("forward"); tic;
+		// toc("forward"); tic;
 		if (inithann) { // means first time
+			LOG(INFO) << "input shape : " <<1<<"*"<<z.channels()<<"*"<<z.rows<<"*"<<z.cols;
 			C = cnn.output_blobs()[0]->channels();
 			H = cnn.output_blobs()[0]->height();
 			W = cnn.output_blobs()[0]->width();
 			N = C * H * W;
+			LOG(INFO) << "output shape : " <<1<<"*"<<C<<"*"<<H<<"*"<<W;
 			// init_fft_plan();
 			allocate(); // allocate memory space
-			toc("inithann"); tic;
+			tic;
+			createHanningWindow();
+			toc("inithann");
 		}
 		// realToComplex(cnn.output_blobs()[0]->gpu_data(), N, conv_feature);
 
 		CUDA_CHECK(cudaMemcpy2D(conv_feature, sizeof(cuComplex), cnn.output_blobs()[0]->gpu_data(), 
 				sizeof(float), sizeof(float), N, cudaMemcpyDeviceToDevice));
-		toc("real2comp");
+		// toc("real2comp");
+
     }
 
     // HOG features
@@ -619,6 +625,33 @@ void KCFTracker::createHanningMats()
     else {
         hann = hann2d;
     }
+}
+
+// TODO GPU
+void KCFTracker::createHanningWindow() {
+	tic;
+    cv::Mat hann1t = cv::Mat(cv::Size(H,1), CV_32F, cv::Scalar(0));
+    cv::Mat hann2t = cv::Mat(cv::Size(1,W), CV_32F, cv::Scalar(0)); 
+
+    for (int i = 0; i < hann1t.cols; i++)
+        hann1t.at<float > (0, i) = 0.5 * (1 - std::cos(2 * 3.14159265358979323846 * i / (hann1t.cols - 1)));
+    for (int i = 0; i < hann2t.rows; i++)
+        hann2t.at<float > (i, 0) = 0.5 * (1 - std::cos(2 * 3.14159265358979323846 * i / (hann2t.rows - 1)));
+
+    cv::Mat hann2d = hann2t * hann1t;
+	cv::Mat hann1d = hann2d.reshape(1,1);
+    
+	cv::Mat hann = cv::Mat(cv::Size(H*W, C), CV_32F, cv::Scalar(0));
+    for (int i = 0; i < C; i++) {
+        for (int j = 0; j<H*W; j++) {
+            hann.at<float>(i,j) = hann1d.at<float>(0,j);
+        }
+    }
+	LOG(INFO) << "hanning !!!" << hann.rows << "*" << hann.cols;
+	toc("hanning window took");
+
+	CUDA_CHECK(cudaMemcpy2D(hann_window, sizeof(cuComplex), hann.data, 
+			sizeof(float), sizeof(float), N, cudaMemcpyHostToDevice));
 }
 
 // Calculate sub-pixel peak for one dimension

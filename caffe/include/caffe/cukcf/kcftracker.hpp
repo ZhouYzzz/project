@@ -138,6 +138,9 @@ protected:
 
     // Initialize Hanning window. Function called only in the first frame.
     void createHanningMats();
+	
+	// GPU
+	void createHanningWindow();
 
     // Calculate sub-pixel peak for one dimension
     float subPixelPeak(float left, float center, float right);
@@ -159,6 +162,7 @@ protected:
 	caffe::Timer t;
 
 	cuComplex* conv_feature;
+	cuComplex* hann_window;
 	cuComplex* k;
 	int N, C, H, W;
 

@@ -57,7 +57,9 @@ int main(int argc, char** argv)
 	LOG(INFO) << blob.cpu_data()[0];
 	//tracker.cnn.input_blobs()[0]->mutable_cpu_data() = im;
 	KCFTracker tracker(FLAGS_model, FLAGS_weights, param);//, true,true,true,true);
-	tracker.init(Rect(0,0,10,10), im);
+	tracker.init(Rect(70,70,50,50), im);
+	LOG(INFO) << tracker.update(im);
+	LOG(INFO) << tracker.update(im);
 	LOG(INFO) << tracker.update(im);
 	return 0;
 }
