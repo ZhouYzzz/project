@@ -89,7 +89,9 @@ the use of this software, even if advised of the possibility of such damage.
 #endif
 
 // Constructor
-KCFTracker::KCFTracker(bool hog, bool fixed_window, bool multiscale, bool lab)
+KCFTracker::KCFTracker(string model, string weights, bool hog, bool fixed_window, bool multiscale, bool lab)
+: cnn(model, caffe::TEST)
+: trans(new caffe::TransformationParameter, caffe::TEST)
 {
 
     // Parameters equal in all cases
@@ -400,6 +402,11 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
     if (z.cols != _tmpl_sz.width || z.rows != _tmpl_sz.height) {
         cv::resize(z, z, _tmpl_sz);
     }   
+
+    // CONV features
+    if (_convfeatures) {
+        
+    }
 
     // HOG features
     if (_hogfeatures) {

@@ -83,6 +83,7 @@ the use of this software, even if advised of the possibility of such damage.
 #pragma once
 
 #include "tracker.h"
+#include "caffe/caffe.hpp"
 
 #ifndef _OPENCV_KCFTRACKER_HPP_
 #define _OPENCV_KCFTRACKER_HPP_
@@ -140,6 +141,10 @@ protected:
     cv::Mat _den;
     cv::Mat _labCentroids;
 
+    // CONV
+    caffe::Net<float> cnn;
+    caffe::DataTransformer<float> trans;
+
 private:
     int size_patch[3];
     cv::Mat hann;
@@ -148,4 +153,5 @@ private:
     int _gaussian_size;
     bool _hogfeatures;
     bool _labfeatures;
+
 };
