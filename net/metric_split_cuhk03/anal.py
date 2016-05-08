@@ -9,7 +9,7 @@ caffe.set_device(2)
 dist_sim = np.array([],dtype=np.float32)
 dist_diff = np.array([],dtype=np.float32)
 
-net = caffe.Net('anal_train.prototxt','snapshots/train_val_iter_3000.caffemodel',caffe.TEST)
+net = caffe.Net('anal_test.prototxt','snapshots/train_val_iter_10000.caffemodel',caffe.TEST)
 
 N = 100
 

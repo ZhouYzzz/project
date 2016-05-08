@@ -12,7 +12,7 @@ def parse_args():
         help='The sepecified structure (.prototxt)')
     parser.add_argument(
         '-M', '--model', action='store', dest='model',
-        type=str, default=_TFP+'/snapshots/train_val_iter_2000.caffemodel',
+        type=str, default=_TFP+'/snapshots/train_val_iter_10000.caffemodel',
         help='The trained model file (.caffemodel)'
     )
 
