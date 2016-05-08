@@ -12,7 +12,7 @@
 
 DEFINE_string(model, "net/metric_split_cuhk03/feat.prototxt",
     "The model definition protocol buffer text file.");
-DEFINE_string(weights, "net/metric_split_cuhk03/snapshots/train_val_iter_3000.caffemodel",
+DEFINE_string(weights, "net/metric_split_cuhk03/snapshots/train_val_iter_10000.caffemodel",
     "the pretrained weights to for testing.");
 
 using caffe::Caffe;
@@ -56,8 +56,8 @@ int main(int argc, char** argv)
 	LOG(INFO) << t.MilliSeconds();
 	LOG(INFO) << blob.cpu_data()[0];
 	//tracker.cnn.input_blobs()[0]->mutable_cpu_data() = im;
-	KCFTracker tracker(true,true,true,true);
+	KCFTracker tracker(FLAGS_model, FLAGS_weights, param);//, true,true,true,true);
 	tracker.init(Rect(0,0,10,10), im);
-	//LOG(INFO) << tracker.update(im);
+	LOG(INFO) << tracker.update(im);
 	return 0;
 }

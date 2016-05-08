@@ -83,7 +83,13 @@ the use of this software, even if advised of the possibility of such damage.
 #pragma once
 
 #include "tracker.h"
+
 #include "caffe/caffe.hpp"
+#include "caffe/data_transformer.hpp"
+#include "caffe/proto/caffe.pb.h"
+
+#include "cuComplex.h"
+#include "cufft.h"
 
 #ifndef _OPENCV_KCFTRACKER_HPP_
 #define _OPENCV_KCFTRACKER_HPP_
@@ -93,7 +99,7 @@ class KCFTracker : public Tracker
 {
 public:
     // Constructor
-    KCFTracker(string model, string weights, bool hog = true, bool fixed_window = true, bool multiscale = true, bool lab = true);
+    KCFTracker(std::string model, std::string weights, caffe::TransformationParameter trans_param, bool hog = true, bool fixed_window = true, bool multiscale = true, bool lab = true);
 
     // Initialize tracker 
     virtual void init(const cv::Rect &roi, cv::Mat image);
@@ -122,6 +128,8 @@ protected:
     // Evaluates a Gaussian kernel with bandwidth SIGMA for all relative shifts between input images X and Y, which must both be MxN. They must    also be periodic (ie., pre-processed with a cosine window).
     cv::Mat gaussianCorrelation(cv::Mat x1, cv::Mat x2);
 
+	void linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst);
+
     // Create Gaussian Peak. Function called only in the first frame.
     cv::Mat createGaussianPeak(int sizey, int sizex);
 
@@ -134,6 +142,10 @@ protected:
     // Calculate sub-pixel peak for one dimension
     float subPixelPeak(float left, float center, float right);
 
+	// CUDA allocate memory space
+	void allocate();
+	void init_fft_plan();
+
     cv::Mat _alphaf;
     cv::Mat _prob;
     cv::Mat _tmpl;
@@ -144,6 +156,11 @@ protected:
     // CONV
     caffe::Net<float> cnn;
     caffe::DataTransformer<float> trans;
+	caffe::Timer t;
+
+	cuComplex* conv_feature;
+	cuComplex* k;
+	int N, C, H, W;
 
 private:
     int size_patch[3];
@@ -154,4 +171,20 @@ private:
     bool _hogfeatures;
     bool _labfeatures;
 
+	// CONV
+	cufftHandle planm_;
+	cufftHandle plans_;
+	cublasHandle_t handle_;
+
+	cuComplex* tm1_;
+	cuComplex* tm2_;
+	cuComplex* tm3_;
+	cuComplex* ts1_;
+	cuComplex* ts2_;
+	cuComplex* ts3_;
+
+	cuComplex one_;
+	cuComplex zero_;
+	cuComplex* ones_;
+	cuComplex* null_;
 };

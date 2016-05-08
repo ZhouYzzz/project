@@ -86,12 +86,38 @@ the use of this software, even if advised of the possibility of such damage.
 #include "caffe/cukcf/recttools.hpp"
 #include "caffe/cukcf/fhog.hpp"
 #include "caffe/cukcf/labdata.hpp"
+
+#include "caffe/caffe.hpp"
+#include "caffe/data_transformer.hpp"
+#include "caffe/proto/caffe.pb.h"
+#include "caffe/util/math_functions.hpp"
+
+#include "cufft.h"
 #endif
 
+#define CONV_FEAT 1
+
+#define tic t.Start();
+#define toc(msg) t.Stop(); LOG(INFO) << msg << " " << t.MilliSeconds() << " ms";
+
+#define CUFFT_CHECK(condition) \
+		do { \
+			cufftResult result = condition; \
+			CHECK_EQ(result, CUFFT_SUCCESS) << " " << result; \
+		} while (0)
+
+void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
+	if (fromdevice) {
+		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(cuComplex), src, 
+				sizeof(float), sizeof(float), n, cudaMemcpyDeviceToDevice));
+	}else{
+		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(cuComplex), src, 
+				sizeof(float), sizeof(float), n, cudaMemcpyHostToDevice));	
+	}
+}
+
 // Constructor
-KCFTracker::KCFTracker(string model, string weights, bool hog, bool fixed_window, bool multiscale, bool lab)
-: cnn(model, caffe::TEST)
-: trans(new caffe::TransformationParameter, caffe::TEST)
+KCFTracker::KCFTracker(std::string model, std::string weights, caffe::TransformationParameter trans_param, bool hog, bool fixed_window, bool multiscale, bool lab) : cnn(model, caffe::TEST) , trans(trans_param, caffe::TEST)
 {
 
     // Parameters equal in all cases
@@ -157,6 +183,40 @@ KCFTracker::KCFTracker(string model, string weights, bool hog, bool fixed_window
         template_size = 1;
         scale_step = 1;
     }
+
+	cnn.CopyTrainedLayersFrom(weights); // cnn load weights
+	handle_ = caffe::Caffe::cublas_handle();
+}
+
+// TODO allocate memory space
+void KCFTracker::allocate() {
+	using namespace caffe;
+	one_ = make_cuFloatComplex(1.0, 0.0);
+	zero_ = make_cuFloatComplex(0.0, 0.0);
+	CUDA_CHECK(cudaMalloc((void**)&null_, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&ones_, sizeof(cuComplex)*C));
+	caffe_gpu_set_C(C, one_, ones_);
+
+	CUDA_CHECK(cudaMalloc((void**)&conv_feature, sizeof(cuComplex)*N));
+
+	CUDA_CHECK(cudaMalloc((void**)&k, sizeof(cuComplex)*H*W));
+
+	CUDA_CHECK(cudaMalloc((void**)&tm1_, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&tm2_, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&tm3_, sizeof(cuComplex)*N));
+
+	CUDA_CHECK(cudaMalloc((void**)&ts1_, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&ts2_, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&ts3_, sizeof(cuComplex)*H*W));
+}
+
+void KCFTracker::init_fft_plan() {
+	int shape[2] = {W, H};
+	CUFFT_CHECK(cufftPlanMany(&planm_, 2, shape,
+			NULL, 1, H*W,
+			NULL, 1, H*W,
+			CUFFT_C2C, N)); // N*C batches of 2D metric of size H*W
+	CUFFT_CHECK(cufftPlan2d(&plans_, H, W, CUFFT_C2C));
 }
 
 // Initialize tracker 
@@ -165,6 +225,9 @@ void KCFTracker::init(const cv::Rect &roi, cv::Mat image)
     _roi = roi;
     assert(roi.width >= 0 && roi.height >= 0);
     _tmpl = getFeatures(image, 1);
+	tic;
+	init_fft_plan();
+	toc("init_fft_plan");
     _prob = createGaussianPeak(size_patch[0], size_patch[1]);
     _alphaf = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     //_num = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
@@ -264,6 +327,12 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
 {
     using namespace FFTTools;
 
+	if (CONV_FEAT) {
+		tic;
+		linearCorrelation(conv_feature, conv_feature, k);
+		toc("linearCorrelation");
+	}
+
     cv::Mat k = gaussianCorrelation(x, x);
     cv::Mat alphaf = complexDivision(_prob, (fftd(k) + lambda));
     
@@ -281,6 +350,22 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
 
     _alphaf = complexDivision(_num, _den);*/
 
+}
+
+void KCFTracker::linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst) {
+	using namespace caffe;
+	CUFFT_CHECK(cufftExecC2C(planm_, const_cast<cuComplex*>(a), tm1_, CUFFT_FORWARD));
+	CUFFT_CHECK(cufftExecC2C(planm_, const_cast<cuComplex*>(b), tm2_, CUFFT_FORWARD));
+	caffe_gpu_mul_cjC(N, tm1_, tm2_, tm3_);
+	LOG(INFO) << "holly buff";
+	CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T,
+			H*W, C, 
+			&one_, 
+			tm3_, C, 
+			ones_, 1, 
+			&zero_, 
+			dst, 1));
+	CUFFT_CHECK(cufftExecC2C(plans_, dst, dst, CUFFT_INVERSE));
 }
 
 // Evaluates a Gaussian kernel with bandwidth SIGMA for all relative shifts between input images X and Y, which must both be MxN. They must    also be periodic (ie., pre-processed with a cosine window).
@@ -403,9 +488,29 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
         cv::resize(z, z, _tmpl_sz);
     }   
 
-    // CONV features
-    if (_convfeatures) {
-        
+    // TODO: CONV features
+	// void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
+    if (CONV_FEAT) {
+		tic;
+		cnn.input_blobs()[0]->Reshape(1, z.channels(), z.rows, z.cols);
+        trans.Transform(z, cnn.input_blobs()[0]);
+		toc("input"); tic;
+		cnn.Forward();
+		toc("forward"); tic;
+		if (inithann) { // means first time
+			C = cnn.output_blobs()[0]->channels();
+			H = cnn.output_blobs()[0]->height();
+			W = cnn.output_blobs()[0]->width();
+			N = C * H * W;
+			// init_fft_plan();
+			allocate(); // allocate memory space
+			toc("inithann"); tic;
+		}
+		// realToComplex(cnn.output_blobs()[0]->gpu_data(), N, conv_feature);
+
+		CUDA_CHECK(cudaMemcpy2D(conv_feature, sizeof(cuComplex), cnn.output_blobs()[0]->gpu_data(), 
+				sizeof(float), sizeof(float), N, cudaMemcpyDeviceToDevice));
+		toc("real2comp");
     }
 
     // HOG features
