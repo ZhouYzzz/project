@@ -215,7 +215,7 @@ void KCFTracker::init_fft_plan() {
 	CUFFT_CHECK(cufftPlanMany(&planm_, 2, shape,
 			NULL, 1, H*W,
 			NULL, 1, H*W,
-			CUFFT_C2C, N)); // N*C batches of 2D metric of size H*W
+			CUFFT_C2C, C)); // C batches of 2D metric of size H*W
 	CUFFT_CHECK(cufftPlan2d(&plans_, H, W, CUFFT_C2C));
 }
 
@@ -328,9 +328,7 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
     using namespace FFTTools;
 
 	if (CONV_FEAT) {
-		tic;
 		linearCorrelation(conv_feature, conv_feature, k);
-		toc("linearCorrelation");
 	}
 
     cv::Mat k = gaussianCorrelation(x, x);
@@ -354,18 +352,22 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
 
 void KCFTracker::linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst) {
 	using namespace caffe;
+	tic;
 	CUFFT_CHECK(cufftExecC2C(planm_, const_cast<cuComplex*>(a), tm1_, CUFFT_FORWARD));
+	CUDA_CHECK(cudaDeviceSynchronize());
 	CUFFT_CHECK(cufftExecC2C(planm_, const_cast<cuComplex*>(b), tm2_, CUFFT_FORWARD));
+	CUDA_CHECK(cudaDeviceSynchronize());
 	caffe_gpu_mul_cjC(N, tm1_, tm2_, tm3_);
-	LOG(INFO) << "holly buff";
 	CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T,
-			H*W, C, 
+			C, H*W, 
 			&one_, 
 			tm3_, C, 
 			ones_, 1, 
 			&zero_, 
 			dst, 1));
 	CUFFT_CHECK(cufftExecC2C(plans_, dst, dst, CUFFT_INVERSE));
+	CUDA_CHECK(cudaDeviceSynchronize());
+	toc("linear correlation");
 }
 
 // Evaluates a Gaussian kernel with bandwidth SIGMA for all relative shifts between input images X and Y, which must both be MxN. They must    also be periodic (ie., pre-processed with a cosine window).
