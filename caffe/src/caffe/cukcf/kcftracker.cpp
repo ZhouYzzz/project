@@ -97,8 +97,8 @@ the use of this software, even if advised of the possibility of such damage.
 
 #define CONV_FEAT 1
 
-#define tic t.Start();
-#define toc(msg) t.Stop(); LOG(INFO) << msg << " " << t.MilliSeconds() << " ms";
+#define tic ; //t.Start();
+#define toc(msg) ; //t.Stop(); LOG(INFO) << msg << " " << t.MilliSeconds() << " ms";
 
 #define CUFFT_CHECK(condition) \
 		do { \
@@ -132,7 +132,7 @@ KCFTracker::KCFTracker(std::string model, std::string weights, caffe::Transforma
 
     // Parameters equal in all cases
     lambda = 0.0001;
-	lambdaC = make_cuFloatComplex(0.0001, 0);
+	lambdaC = make_cuFloatComplex(0.1, 0);
     padding = 2.5; 
     //output_sigma_factor = 0.1;
     output_sigma_factor = 0.125;
@@ -229,7 +229,7 @@ void KCFTracker::allocate() {
 }
 
 void KCFTracker::init_fft_plan() {
-	int shape[2] = {W, H};
+	int shape[2] = {H, W};
 	CUFFT_CHECK(cufftPlanMany(&planm_, 2, shape,
 			NULL, 1, H*W,
 			NULL, 1, H*W,
@@ -241,9 +241,12 @@ void KCFTracker::init_fft_plan() {
 void KCFTracker::init(const cv::Rect &roi, cv::Mat image)
 {
     _roi = roi;
+
+	LOG(INFO) << "[ROI]" << _roi;
+
     assert(roi.width >= 0 && roi.height >= 0);
     _tmpl = getFeatures(image, 1);
-
+	getConvFeature(image, 1);
 	// GPU
 	tic; init_fft_plan(); toc("init_fft_plan");
 	createGaussianProb();
@@ -270,9 +273,11 @@ cv::Rect KCFTracker::update(cv::Mat image)
 
     float peak_value;
     cv::Point2f res = detect(_tmpl, getFeatures(image, 0, 1.0f), peak_value);
+	// LOG(INFO) << "Tradition peak value:"<< peak_value;
 	
 	tic;
-	cv::Point2f res_gpu = detect_gpu();
+	getConvFeature(image, 0, 1.0f);
+	cv::Point2f gpu_res = detect_gpu();
 	toc("DETECT GPU");
 
     if (scale_step != 1) {
@@ -301,6 +306,7 @@ cv::Rect KCFTracker::update(cv::Mat image)
     }
 
     // Adjust by cell size and _scale
+	// LOG(INFO) << "scale:" << _scale;
     _roi.x = cx - _roi.width / 2.0f + ((float) res.x * cell_size * _scale);
     _roi.y = cy - _roi.height / 2.0f + ((float) res.y * cell_size * _scale);
 
@@ -309,11 +315,14 @@ cv::Rect KCFTracker::update(cv::Mat image)
     if (_roi.x + _roi.width <= 0) _roi.x = -_roi.width + 2;
     if (_roi.y + _roi.height <= 0) _roi.y = -_roi.height + 2;
 
+	LOG(INFO) << "[ROI]" << _roi;
+
     assert(_roi.width >= 0 && _roi.height >= 0);
     cv::Mat x = getFeatures(image, 0);
     train(x, interp_factor);
 
 	tic;
+	getConvFeature(image, 0);
 	train_gpu(interp_factor);
 	toc("TRAIN_GPU");
 
@@ -330,6 +339,8 @@ cv::Point2f KCFTracker::detect(cv::Mat z, cv::Mat x, float &peak_value)
 
     cv::Mat k = gaussianCorrelation(x, z);
     cv::Mat res = (real(fftd(complexMultiplication(_alphaf, fftd(k)), true)));
+
+	// LOG(INFO) << res;
 
 
     //minMaxLoc only accepts doubles for the peak, and integer points for the coordinates
@@ -352,7 +363,7 @@ cv::Point2f KCFTracker::detect(cv::Mat z, cv::Mat x, float &peak_value)
     p.x -= (res.cols) / 2;
     p.y -= (res.rows) / 2;
 
-	LOG(INFO) << "[p]old: " << p;
+	LOG(INFO) << "[pT]: " << p;
 
     return p;
 }
@@ -361,9 +372,13 @@ cv::Point2f KCFTracker::detect_gpu() {
 	tic;
 	using namespace caffe;
 	linearCorrelation(tmpl, conv_feature, k);
-	CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD));
+	// CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD));
 	caffe_gpu_mul_C(H*W, k, alphaf, ts1_);
 	CUFFT_CHECK(cufftExecC2C(plans_, ts1_, ts1_, CUFFT_INVERSE)); // ts1_ = ifft2(ts1_)
+	// scale by 1/N
+	float fac = 1.0/N;
+	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fac, ts1_, 1)); // scale by (1-factor)
+	
 	caffe_gpu_real_C(H*W, ts1_, resp);
 
 	// float* check = (float*)std::calloc(H*W, sizeof(float));
@@ -374,19 +389,19 @@ cv::Point2f KCFTracker::detect_gpu() {
     // cv::Point2f p(0.0, 0.0);
 	CUDA_CHECK(cudaMemcpy(res.data, resp, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
 
-	// LOG(INFO) << res.data[0];
+	// LOG(INFO) << res;
 
     cv::Point2i pi;
     double pv;
     cv::minMaxLoc(res, NULL, &pv, NULL, &pi);
     float peak_value = (float) pv;
 
-	//LOG(INFO) << "detect_gpu peak value: " << peak_value;
+	// LOG(INFO) << "detect_gpu peak value: " << peak_value;
     //subpixel peak estimation, coordinates will be non-integer
     cv::Point2f p((float)pi.x, (float)pi.y);
 
-	LOG(INFO)<<"log:["<<res.rows<<","<<res.cols<<"]=["<<H<<","<<W<<"]";
-	LOG(INFO)<<(float)pi.x-(float)W/2<<","<<(float)pi.y-(float)H/2;
+	// LOG(INFO)<<"log:["<<res.rows<<","<<res.cols<<"]=["<<H<<","<<W<<"]";
+	// LOG(INFO)<<(float)pi.x-(float)W/2<<","<<(float)pi.y-(float)H/2;
 
     if (pi.x > 0 && pi.x < res.cols-1) {
         p.x += subPixelPeak(res.at<float>(pi.y, pi.x-1), peak_value, res.at<float>(pi.y, pi.x+1));
@@ -411,7 +426,7 @@ void KCFTracker::train_init_gpu() {
 	tic;
 	linearCorrelation(conv_feature, conv_feature, k);
 
-	CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD)); // fft(k)
+	// CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD)); // fft(k)
 	caffe_gpu_add_scalar_C(H*W, k, lambdaC, ts1_); // fft(k)+lambda
 	caffe_gpu_div_C(H*W, probf, ts1_, alphaf); // alphaf = probf / fft(k)+lambda
 	
@@ -424,7 +439,8 @@ void KCFTracker::train_gpu(float train_interp_factor) {
 	tic;
 	linearCorrelation(conv_feature, conv_feature, k);
 
-	CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD)); // fft(k)
+	// CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD)); // fft(k)
+	
 	caffe_gpu_add_scalar_C(H*W, k, lambdaC, ts1_); // fft(k)+lambda
 	caffe_gpu_div_C(H*W, probf, ts1_, ts2_); // alphaf(ts2_) = probf / fft(k)+lambda
 	
@@ -464,6 +480,7 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
 }
 
 void KCFTracker::linearCorrelation(const cuComplex* a, const cuComplex* b, cuComplex* dst) {
+	// sum ( conj(fft(a)) .* fft(b) , 3 )
 	using namespace caffe;
 	CUFFT_CHECK(cufftExecC2C(planm_, const_cast<cuComplex*>(a), tm1_, CUFFT_FORWARD));
 	CUDA_CHECK(cudaDeviceSynchronize());
@@ -477,8 +494,10 @@ void KCFTracker::linearCorrelation(const cuComplex* a, const cuComplex* b, cuCom
 			ones_, 1, 
 			&zero_, 
 			dst, 1));
-	CUFFT_CHECK(cufftExecC2C(plans_, dst, dst, CUFFT_INVERSE));
-	CUDA_CHECK(cudaDeviceSynchronize());
+	//float numel = 1/N;
+	//CUBLAS_CHECK(cublasCsscal(handle_, H*W, &numel, dst, 1)); // scale by 1/numel
+	// CUFFT_CHECK(cufftExecC2C(plans_, dst, dst, CUFFT_INVERSE));
+	// CUDA_CHECK(cudaDeviceSynchronize());
 }
 
 // Evaluates a Gaussian kernel with bandwidth SIGMA for all relative shifts between input images X and Y, which must both be MxN. They must    also be periodic (ie., pre-processed with a cosine window).
@@ -535,6 +554,8 @@ cv::Mat KCFTracker::createGaussianPeak(int sizey, int sizex)
             int jh = j - sxh;
             res(i, j) = std::exp(mult * (float) (ih * ih + jh * jh));
         }
+
+	// LOG(INFO) << "res_kcf" << res;
     return FFTTools::fftd(res);
 }
 
@@ -556,9 +577,97 @@ void KCFTracker::createGaussianProb() {
 
 	// CUDA_CHECK(cudaMemcpy2D(probf, sizeof(cuComplex), res.data, 
 	// 		sizeof(float), sizeof(float), H*W, cudaMemcpyHostToDevice));
+	// LOG(INFO) << "res: "<< res;
 	CUDA_CHECK(cudaMemcpy(tf1_, res.data, sizeof(float)*H*W, cudaMemcpyHostToDevice));
 	caffe::caffe_gpu_cpy_R2C(H*W, tf1_, probf);
 	CUFFT_CHECK(cufftExecC2C(plans_, probf, probf, CUFFT_FORWARD));
+}
+
+void KCFTracker::getConvFeature(const cv::Mat & image, bool inithann, float scale_adjust)
+{
+    cv::Rect extracted_roi;
+
+    float cx = _roi.x + _roi.width / 2;
+    float cy = _roi.y + _roi.height / 2;
+
+    if (inithann) {
+        int padded_w = _roi.width * padding;
+        int padded_h = _roi.height * padding;
+        
+        if (template_size > 1) {  // Fit largest dimension to the given template size
+            if (padded_w >= padded_h)  //fit to width
+                _scale = padded_w / (float) template_size;
+            else
+                _scale = padded_h / (float) template_size;
+
+            _tmpl_sz.width = padded_w / _scale;
+            _tmpl_sz.height = padded_h / _scale;
+        }
+        else {  //No template size given, use ROI size
+            _tmpl_sz.width = padded_w;
+            _tmpl_sz.height = padded_h;
+            _scale = 1;
+            // original code from paper:
+            /*if (sqrt(padded_w * padded_h) >= 100) {   //Normal size
+                _tmpl_sz.width = padded_w;
+                _tmpl_sz.height = padded_h;
+                _scale = 1;
+            }
+            else {   //ROI is too big, track at half size
+                _tmpl_sz.width = padded_w / 2;
+                _tmpl_sz.height = padded_h / 2;
+                _scale = 2;
+            }*/
+        }
+
+        if (_hogfeatures) {
+            // Round to cell size and also make it even
+            _tmpl_sz.width = ( ( (int)(_tmpl_sz.width / (2 * cell_size)) ) * 2 * cell_size ) + cell_size*2;
+            _tmpl_sz.height = ( ( (int)(_tmpl_sz.height / (2 * cell_size)) ) * 2 * cell_size ) + cell_size*2;
+        }
+        else {  //Make number of pixels even (helps with some logic involving half-dimensions)
+            _tmpl_sz.width = (_tmpl_sz.width / 2) * 2;
+            _tmpl_sz.height = (_tmpl_sz.height / 2) * 2;
+        }
+    }
+
+    extracted_roi.width = scale_adjust * _scale * _tmpl_sz.width;
+    extracted_roi.height = scale_adjust * _scale * _tmpl_sz.height;
+
+    // center roi with new size
+    extracted_roi.x = cx - extracted_roi.width / 2;
+    extracted_roi.y = cy - extracted_roi.height / 2;
+
+	LOG(INFO) << "EXTRA ROI: "<< extracted_roi;
+
+    cv::Mat FeaturesMap;  
+    cv::Mat z = RectTools::subwindow(image, extracted_roi, cv::BORDER_REPLICATE);
+
+	// CONV part
+	//
+	
+    if (z.cols != _tmpl_sz.width || z.rows != _tmpl_sz.height) {
+        cv::resize(z, z, _tmpl_sz);
+    }   
+
+    // TODO: CONV features
+	// void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
+	cnn.input_blobs()[0]->Reshape(1, z.channels(), z.rows, z.cols);
+    trans.Transform(z, cnn.input_blobs()[0]);
+	cnn.Forward();
+	if (inithann) { // means first time
+		LOG(INFO) << "input shape : " <<1<<"*"<<z.channels()<<"*"<<z.rows<<"*"<<z.cols;
+		C = cnn.output_blobs()[0]->channels();
+		H = cnn.output_blobs()[0]->height();
+		W = cnn.output_blobs()[0]->width();
+		N = C * H * W;
+		LOG(INFO) << "output shape : " <<1<<"*"<<C<<"*"<<H<<"*"<<W;
+		allocate(); // allocate memory space
+		createHanningWindow();
+	}
+
+	caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+	caffe::caffe_gpu_mul_C(N, tm1_, hann_window, conv_feature);
 }
 
 // Obtain sub-window from image, with replication-padding and extract features
@@ -620,54 +729,11 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
     cv::Mat FeaturesMap;  
     cv::Mat z = RectTools::subwindow(image, extracted_roi, cv::BORDER_REPLICATE);
     
-    if (z.cols != _tmpl_sz.width || z.rows != _tmpl_sz.height) {
+	LOG(INFO) << "EXTRA ROI: "<< extracted_roi;
+    
+	if (z.cols != _tmpl_sz.width || z.rows != _tmpl_sz.height) {
         cv::resize(z, z, _tmpl_sz);
     }   
-
-    // TODO: CONV features
-	// void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
-    if (CONV_FEAT) {
-		//tic;
-		tic;
-		cnn.input_blobs()[0]->Reshape(1, z.channels(), z.rows, z.cols);
-		// cnn.Reshape();
-        trans.Transform(z, cnn.input_blobs()[0]);
-		// LOG(INFO) << "input: " << cnn.input_blobs()[0]->data_at(0,0,0,0);
-		// LOG(INFO) << "param: " << cnn.layers()[1]->blobs()[0]->data_at(0,0,0,0);
-		// toc("input"); tic;
-		cnn.Forward();
-		// toc("forward"); tic;
-		if (inithann) { // means first time
-			LOG(INFO) << "input shape : " <<1<<"*"<<z.channels()<<"*"<<z.rows<<"*"<<z.cols;
-			C = cnn.output_blobs()[0]->channels();
-			H = cnn.output_blobs()[0]->height();
-			W = cnn.output_blobs()[0]->width();
-			N = C * H * W;
-			LOG(INFO) << "output shape : " <<1<<"*"<<C<<"*"<<H<<"*"<<W;
-			// init_fft_plan();
-			allocate(); // allocate memory space
-			// tic;
-			createHanningWindow();
-			// toc("inithann");
-		}
-
-		// LOG(INFO) << "asum of feature:" << cnn.output_blobs()[0]->asum_data();
-
-		// CUDA_CHECK(cudaMemcpy2D(tm1_, sizeof(cuComplex), cnn.output_blobs()[0]->gpu_data(), sizeof(float), sizeof(float), N, cudaMemcpyDeviceToDevice));
-		// CUDA_CHECK(cudaMemcpy(tf1_, cnn.output_blobs()[0]->gpu_data(), sizeof(float)*N, cudaMemcpyDeviceToDevice));
-		caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
-		caffe::caffe_gpu_mul_C(N, tm1_, hann_window, conv_feature);
-		// float* check = complexToReal(conv_feature, N);
-		// caffe::caffe_gpu_real_C(N, conv_feature, tf1_);
-		// float* check = (float*)std::calloc(N, sizeof(float));
-		// CUDA_CHECK(cudaMemcpy(check, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
-		// int i;
-		//for (i=0;i<N;i++)
-		//	std::cout << " " << check[i];
-
-		//std::cout << std::endl;
-		toc("GET CONV FEATURE");
-    }
 
     // HOG features
     if (_hogfeatures) {
@@ -743,6 +809,33 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
         createHanningMats();
     }
     FeaturesMap = hann.mul(FeaturesMap);
+
+	// TEST
+	//
+	//
+	//
+	//
+	//
+	//cnn.input_blobs()[0]->Reshape(1, z.channels(), z.rows, z.cols);
+    //trans.Transform(z, cnn.input_blobs()[0]);
+	//cnn.Forward();
+	//if (inithann) { // means first time
+	//	LOG(INFO) << "input shape : " <<1<<"*"<<z.channels()<<"*"<<z.rows<<"*"<<z.cols;
+	//	C = cnn.output_blobs()[0]->channels();
+	//	H = cnn.output_blobs()[0]->height();
+	//	W = cnn.output_blobs()[0]->width();
+	//	N = C * H * W;
+	//	LOG(INFO) << "output shape : " <<1<<"*"<<C<<"*"<<H<<"*"<<W;
+	//	allocate(); // allocate memory space
+	//	createHanningWindow();
+	//}
+
+	//caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+	//caffe::caffe_gpu_mul_C(N, tm1_, hann_window, conv_feature);
+	//CHECK_EQ(FeaturesMap.rows, H); CHECK_EQ(FeaturesMap.cols, W);
+	//caffe::caffe_gpu_real_C(N, conv_feature, tf1_);
+	//CUDA_CHECK(cudaMemcpy(FeaturesMap.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+
     return FeaturesMap;
 }
     

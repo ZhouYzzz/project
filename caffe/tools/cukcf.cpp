@@ -10,10 +10,12 @@
 
 #include "opencv2/opencv.hpp"
 
+#include <cstdio>
 DEFINE_string(model, "net/metric_split_cuhk03/feat.prototxt",
     "The model definition protocol buffer text file.");
 DEFINE_string(weights, "net/metric_split_cuhk03/snapshots/train_val_iter_10000.caffemodel",
     "the pretrained weights to for testing.");
+
 
 using caffe::Caffe;
 using namespace cv;
@@ -34,22 +36,27 @@ int main(int argc, char** argv)
 
 	caffe::TransformationParameter param;
 	
-	KCFTracker tracker(FLAGS_model, FLAGS_weights, param);
-	Mat im = imread("database/MotorRolling/img/0001.jpg", CV_LOAD_IMAGE_COLOR);
+	KCFTracker tracker(FLAGS_model, FLAGS_weights, param,true,true,false,true);
+	Mat im = imread("database/vot2013/bolt/00000001.jpg", CV_LOAD_IMAGE_COLOR);
 	LOG(INFO) << im.rows << " * " << im.cols;
 	
-	tracker.init(Rect(117,68,122,125), im);
+	tracker.init(Rect(336,165,25,60), im);
 	
-	caffe::Timer t;
-	t.Start();
-	im = imread("database/MotorRolling/img/0001.jpg", CV_LOAD_IMAGE_COLOR);
-	LOG(INFO) << tracker.update(im);
-	t.Stop();
-	LOG(INFO) << "[TAKE]" << t.MilliSeconds() << "ms";
+//	caffe::Timer t;
+//	t.Start();
+//	im = imread("database/vot2013/bolt/00000001.jpg", CV_LOAD_IMAGE_COLOR);
+//	LOG(INFO) << tracker.update(im);
+//	t.Stop();
+//	LOG(INFO) << "[TAKE]" << t.MilliSeconds() << "ms";
 	
-	im = imread("database/MotorRolling/img/0001.jpg", CV_LOAD_IMAGE_COLOR);
-	LOG(INFO) << tracker.update(im);
-	im = imread("database/MotorRolling/img/0001.jpg", CV_LOAD_IMAGE_COLOR);
-	LOG(INFO) << tracker.update(im);
+	int i;
+	char name[200];
+	for (i=2;i<100;i++) {
+		snprintf(name, sizeof(char)*100, "database/vot2013/bolt/%08d.jpg", i);
+		// LOG(INFO) << name;
+		im = imread(name, CV_LOAD_IMAGE_COLOR);
+		LOG(INFO) << i << "=============" << tracker.update(im);
+
+	}
 	return 0;
 }

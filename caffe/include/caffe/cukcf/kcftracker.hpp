@@ -139,6 +139,7 @@ protected:
     
 	// Obtain sub-window from image, with replication-padding and extract features
     cv::Mat getFeatures(const cv::Mat & image, bool inithann, float scale_adjust = 1.0f);
+	void getConvFeature(const cv::Mat & image, bool inithann, float scale_adjust = 1.0f);
 
     // Initialize Hanning window. Function called only in the first frame.
     void createHanningMats();

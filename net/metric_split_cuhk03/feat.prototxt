@@ -26,7 +26,8 @@ input: "data"
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 2
+      stride: 1
+	  pad: 2
       weight_filler {
         type: "gaussian"
         std: 0.01
