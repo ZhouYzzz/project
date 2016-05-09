@@ -110,6 +110,7 @@ public:
     float interp_factor; // linear interpolation factor for adaptation
     float sigma; // gaussian kernel bandwidth
     float lambda; // regularization
+	cuComplex lambdaC;
     int cell_size; // HOG cell size
     int cell_sizeQ; // cell size^2, to avoid repeated operations
     float padding; // extra area surrounding the target
@@ -121,9 +122,11 @@ public:
 protected:
     // Detect object in the current frame.
     cv::Point2f detect(cv::Mat z, cv::Mat x, float &peak_value);
-
+	cv::Point2f detect_gpu();
     // train tracker with a single image
     void train(cv::Mat x, float train_interp_factor);
+	void train_init_gpu();
+	void train_gpu(float train_interp_factor);
 
     // Evaluates a Gaussian kernel with bandwidth SIGMA for all relative shifts between input images X and Y, which must both be MxN. They must    also be periodic (ie., pre-processed with a cosine window).
     cv::Mat gaussianCorrelation(cv::Mat x1, cv::Mat x2);
@@ -132,14 +135,13 @@ protected:
 
     // Create Gaussian Peak. Function called only in the first frame.
     cv::Mat createGaussianPeak(int sizey, int sizex);
-
-    // Obtain sub-window from image, with replication-padding and extract features
+	void createGaussianProb();
+    
+	// Obtain sub-window from image, with replication-padding and extract features
     cv::Mat getFeatures(const cv::Mat & image, bool inithann, float scale_adjust = 1.0f);
 
     // Initialize Hanning window. Function called only in the first frame.
     void createHanningMats();
-	
-	// GPU
 	void createHanningWindow();
 
     // Calculate sub-pixel peak for one dimension
@@ -164,6 +166,10 @@ protected:
 	cuComplex* conv_feature;
 	cuComplex* hann_window;
 	cuComplex* k;
+	cuComplex* tmpl;
+	cuComplex* alphaf;
+	cuComplex* probf;
+	float* resp;
 	int N, C, H, W;
 
 private:

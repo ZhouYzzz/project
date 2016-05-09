@@ -32,34 +32,19 @@ int main(int argc, char** argv)
 	// LOG(INFO) << tracker.cnn.input_blobs()[0]->count();
 	// LOG(INFO) << tracker.cnn.input_blobs()[0]->mutable_gpu_data();
 
-	Mat im = imread("database/cuhk03/labeled/0001_01.jpg", CV_LOAD_IMAGE_COLOR);
-	LOG(INFO) << im.rows << " * " << im.cols;
-	LOG(INFO) << CV_32F << " " << CV_8U;
-	//Mat_<float> fm;
-	//LOG(INFO) << fm.type();
-	//im.convertTo(fm, CV_32F);
-	//LOG(INFO) << fm.type();
 	caffe::TransformationParameter param;
-	//LOG(INFO) << param.mean_value_size() << " " << param.has_mean_file() ;
-	LOG(INFO) << caffe::TEST;
-	//caffe::DataTransformer<float> trans;
-	//
-	//
-	caffe::Timer t;
-	caffe::DataTransformer<float> trans(param, caffe::TEST);
-	caffe::Blob<float> blob;
-	blob.Reshape(1,im.channels(),im.rows,im.cols);
-	LOG(INFO) << blob.shape(1);
-	t.Start();
-	trans.Transform(im, &blob);
-	t.Stop();
-	LOG(INFO) << t.MilliSeconds();
-	LOG(INFO) << blob.cpu_data()[0];
-	//tracker.cnn.input_blobs()[0]->mutable_cpu_data() = im;
-	KCFTracker tracker(FLAGS_model, FLAGS_weights, param);//, true,true,true,true);
-	tracker.init(Rect(70,70,50,50), im);
+	
+	KCFTracker tracker(FLAGS_model, FLAGS_weights, param);
+	Mat im = imread("database/MotorRolling/img/0001.jpg", CV_LOAD_IMAGE_COLOR);
+	LOG(INFO) << im.rows << " * " << im.cols;
+	
+	tracker.init(Rect(117,68,122,125), im);
+	
+	im = imread("database/MotorRolling/img/0002.jpg", CV_LOAD_IMAGE_COLOR);
 	LOG(INFO) << tracker.update(im);
+	im = imread("database/MotorRolling/img/0003.jpg", CV_LOAD_IMAGE_COLOR);
 	LOG(INFO) << tracker.update(im);
+	im = imread("database/MotorRolling/img/0004.jpg", CV_LOAD_IMAGE_COLOR);
 	LOG(INFO) << tracker.update(im);
 	return 0;
 }

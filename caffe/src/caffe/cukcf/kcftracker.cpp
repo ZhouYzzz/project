@@ -122,6 +122,7 @@ KCFTracker::KCFTracker(std::string model, std::string weights, caffe::Transforma
 
     // Parameters equal in all cases
     lambda = 0.0001;
+	lambdaC = make_cuFloatComplex(0.0001, 0);
     padding = 2.5; 
     //output_sigma_factor = 0.1;
     output_sigma_factor = 0.125;
@@ -200,7 +201,12 @@ void KCFTracker::allocate() {
 	CUDA_CHECK(cudaMalloc((void**)&conv_feature, sizeof(cuComplex)*N));
 	CUDA_CHECK(cudaMalloc((void**)&hann_window, sizeof(cuComplex)*N));
 	CUDA_CHECK(cudaMalloc((void**)&k, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&probf, sizeof(cuComplex)*H*W));
 
+	CUDA_CHECK(cudaMalloc((void**)&tmpl, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&alphaf, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&resp, sizeof(float)*H*W));
+	
 	CUDA_CHECK(cudaMalloc((void**)&tm1_, sizeof(cuComplex)*N));
 	CUDA_CHECK(cudaMalloc((void**)&tm2_, sizeof(cuComplex)*N));
 	CUDA_CHECK(cudaMalloc((void**)&tm3_, sizeof(cuComplex)*N));
@@ -226,13 +232,17 @@ void KCFTracker::init(const cv::Rect &roi, cv::Mat image)
     assert(roi.width >= 0 && roi.height >= 0);
     _tmpl = getFeatures(image, 1);
 
+	// GPU
 	tic; init_fft_plan(); toc("init_fft_plan");
+	createGaussianProb();
 
     _prob = createGaussianPeak(size_patch[0], size_patch[1]);
     _alphaf = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     //_num = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     //_den = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     train(_tmpl, 1.0); // train with initial frame
+
+	train_init_gpu();
  }
 // Update position based on the new frame
 cv::Rect KCFTracker::update(cv::Mat image)
@@ -248,6 +258,8 @@ cv::Rect KCFTracker::update(cv::Mat image)
 
     float peak_value;
     cv::Point2f res = detect(_tmpl, getFeatures(image, 0, 1.0f), peak_value);
+
+	cv::Point2f res_gpu = detect_gpu();
 
     if (scale_step != 1) {
         // Test at a smaller _scale
@@ -287,6 +299,8 @@ cv::Rect KCFTracker::update(cv::Mat image)
     cv::Mat x = getFeatures(image, 0);
     train(x, interp_factor);
 
+	train_gpu(interp_factor);
+
     return _roi;
 }
 
@@ -295,9 +309,12 @@ cv::Rect KCFTracker::update(cv::Mat image)
 cv::Point2f KCFTracker::detect(cv::Mat z, cv::Mat x, float &peak_value)
 {
     using namespace FFTTools;
+	using namespace caffe;
+
 
     cv::Mat k = gaussianCorrelation(x, z);
     cv::Mat res = (real(fftd(complexMultiplication(_alphaf, fftd(k)), true)));
+
 
     //minMaxLoc only accepts doubles for the peak, and integer points for the coordinates
     cv::Point2i pi;
@@ -322,16 +339,62 @@ cv::Point2f KCFTracker::detect(cv::Mat z, cv::Mat x, float &peak_value)
     return p;
 }
 
+cv::Point2f KCFTracker::detect_gpu() {
+	tic;
+	using namespace caffe;
+	linearCorrelation(tmpl, conv_feature, k);
+	CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD));
+	caffe_gpu_mul_C(H*W, k, alphaf, ts1_);
+	CUFFT_CHECK(cufftExecC2C(plans_, ts1_, ts1_, CUFFT_INVERSE)); // ts1_ = ifft2(ts1_)
+	caffe_gpu_real_C(H*W, ts1_, resp);
+
+	cv::Mat res(H, W, CV_32F);
+    cv::Point2f p(0.0,0.0);
+
+	CUDA_CHECK(cudaMemcpy(res.data, resp, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
+
+	toc("detect_gpu");
+	
+	return p;
+}
+
+void KCFTracker::train_init_gpu() {
+	using namespace caffe;
+	tic;
+	linearCorrelation(conv_feature, conv_feature, k);
+
+	CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD)); // fft(k)
+	caffe_gpu_add_scalar_C(H*W, k, lambdaC, ts1_); // fft(k)+lambda
+	caffe_gpu_div_C(H*W, probf, ts1_, alphaf); // alphaf = probf / fft(k)+lambda
+	
+	CUDA_CHECK(cudaMemcpy(tmpl, conv_feature, sizeof(cuComplex)*N, cudaMemcpyDeviceToDevice)); // tmpl = conv_feature
+	
+	toc("train_gpu(init)");
+}
+void KCFTracker::train_gpu(float train_interp_factor) {
+	using namespace caffe;
+	tic;
+	linearCorrelation(conv_feature, conv_feature, k);
+
+	CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD)); // fft(k)
+	caffe_gpu_add_scalar_C(H*W, k, lambdaC, ts1_); // fft(k)+lambda
+	caffe_gpu_div_C(H*W, probf, ts1_, ts2_); // alphaf(ts2_) = probf / fft(k)+lambda
+	
+	float onemin_factor = 1-train_interp_factor;
+	cuComplex factor = make_cuFloatComplex(train_interp_factor, 0);
+	CUBLAS_CHECK(cublasCsscal(handle_, N, &onemin_factor, tmpl, 1)); // scale by (1-factor)
+	CUBLAS_CHECK(cublasCsscal(handle_, H*W,&onemin_factor, ts2_, 1)); // scale by (1-factor)
+	CUBLAS_CHECK(cublasCaxpy(handle_, N, &factor,
+		conv_feature, 1, tmpl, 1));
+	CUBLAS_CHECK(cublasCaxpy(handle_, H*W, &factor,
+		ts2_, 1, alphaf, 1)); // alphaf += factor * alphaf_
+	toc("train_gpu");
+}
+
 // train tracker with a single image
 void KCFTracker::train(cv::Mat x, float train_interp_factor)
 {
     using namespace FFTTools;
-
-	if (CONV_FEAT) {
-		tic;
-		linearCorrelation(conv_feature, conv_feature, k);
-		toc("l cor");
-	}
 
     cv::Mat k = gaussianCorrelation(x, x);
     cv::Mat alphaf = complexDivision(_prob, (fftd(k) + lambda));
@@ -425,6 +488,27 @@ cv::Mat KCFTracker::createGaussianPeak(int sizey, int sizex)
             res(i, j) = std::exp(mult * (float) (ih * ih + jh * jh));
         }
     return FFTTools::fftd(res);
+}
+
+void KCFTracker::createGaussianProb() {
+	cv::Mat_<float> res(H, W);
+    int syh = H / 2;
+    int sxh = W / 2;
+
+    float output_sigma = std::sqrt((float) H * W) / padding * output_sigma_factor;
+    float mult = -0.5 / (output_sigma * output_sigma);
+
+    for (int i = 0; i < H; i++)
+        for (int j = 0; j < W; j++)
+        {
+            int ih = i - syh;
+            int jh = j - sxh;
+            res(i, j) = std::exp(mult * (float) (ih * ih + jh * jh));
+        }
+
+	CUDA_CHECK(cudaMemcpy2D(probf, sizeof(cuComplex), res.data, 
+			sizeof(float), sizeof(float), H*W, cudaMemcpyHostToDevice));
+	CUFFT_CHECK(cufftExecC2C(plans_, probf, probf, CUFFT_FORWARD));
 }
 
 // Obtain sub-window from image, with replication-padding and extract features
