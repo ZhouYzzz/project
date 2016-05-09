@@ -40,11 +40,16 @@ int main(int argc, char** argv)
 	
 	tracker.init(Rect(117,68,122,125), im);
 	
-	im = imread("database/MotorRolling/img/0002.jpg", CV_LOAD_IMAGE_COLOR);
+	caffe::Timer t;
+	t.Start();
+	im = imread("database/MotorRolling/img/0001.jpg", CV_LOAD_IMAGE_COLOR);
 	LOG(INFO) << tracker.update(im);
-	im = imread("database/MotorRolling/img/0003.jpg", CV_LOAD_IMAGE_COLOR);
+	t.Stop();
+	LOG(INFO) << "[TAKE]" << t.MilliSeconds() << "ms";
+	
+	im = imread("database/MotorRolling/img/0001.jpg", CV_LOAD_IMAGE_COLOR);
 	LOG(INFO) << tracker.update(im);
-	im = imread("database/MotorRolling/img/0004.jpg", CV_LOAD_IMAGE_COLOR);
+	im = imread("database/MotorRolling/img/0001.jpg", CV_LOAD_IMAGE_COLOR);
 	LOG(INFO) << tracker.update(im);
 	return 0;
 }

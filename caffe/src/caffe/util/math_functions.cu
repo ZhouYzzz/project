@@ -10,6 +10,17 @@
 
 namespace caffe {
 // ZHOUYZ complex
+
+__global__ void cpy_R2C_kernel(const int n, const float* a, cuComplex* y) {
+	CUDA_KERNEL_LOOP(index, n) {
+		y[index] = make_cuFloatComplex(a[index], 0);
+	}
+}
+
+void caffe_gpu_cpy_R2C(const int N, const float* src, cuComplex* dst) {
+	cpy_R2C_kernel<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS>>>(N, src, dst);
+}
+
 __global__ void set_C_kernel(const int n, const cuComplex alpha, cuComplex* dst) {
 	CUDA_KERNEL_LOOP(index, n) {
 		dst[index] = alpha;

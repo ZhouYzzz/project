@@ -106,15 +106,25 @@ the use of this software, even if advised of the possibility of such damage.
 			CHECK_EQ(result, CUFFT_SUCCESS) << " " << result; \
 		} while (0)
 
-void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
-	if (fromdevice) {
-		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(cuComplex), src, 
-				sizeof(float), sizeof(float), n, cudaMemcpyDeviceToDevice));
-	}else{
-		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(cuComplex), src, 
-				sizeof(float), sizeof(float), n, cudaMemcpyHostToDevice));	
-	}
-}
+// void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
+// 	if (fromdevice) {
+// 		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(cuComplex), src, 
+// 				sizeof(float), sizeof(float), n, cudaMemcpyDeviceToDevice));
+// 	}else{
+// 		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(cuComplex), src, 
+// 				sizeof(float), sizeof(float), n, cudaMemcpyHostToDevice));	
+// 	}
+// }
+// 
+// float* complexToReal(const cuComplex* src, int n, bool tohost=true) {
+// 	float* dst = (float*)std::calloc(n, sizeof(float));
+// 	if (tohost) {
+// 		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(float), src, sizeof(cuComplex), sizeof(float), n, cudaMemcpyDeviceToHost));
+// 	}else{
+// 		CUDA_CHECK(cudaMemcpy2D(dst, sizeof(float), src, sizeof(cuComplex), sizeof(float), n, cudaMemcpyDeviceToDevice));
+// 	}
+// 	return dst;
+// }
 
 // Constructor
 KCFTracker::KCFTracker(std::string model, std::string weights, caffe::TransformationParameter trans_param, bool hog, bool fixed_window, bool multiscale, bool lab) : cnn(model, caffe::TEST) , trans(trans_param, caffe::TEST)
@@ -206,6 +216,8 @@ void KCFTracker::allocate() {
 	CUDA_CHECK(cudaMalloc((void**)&tmpl, sizeof(cuComplex)*N));
 	CUDA_CHECK(cudaMalloc((void**)&alphaf, sizeof(cuComplex)*H*W));
 	CUDA_CHECK(cudaMalloc((void**)&resp, sizeof(float)*H*W));
+
+	CUDA_CHECK(cudaMalloc((void**)&tf1_, sizeof(float)*N));
 	
 	CUDA_CHECK(cudaMalloc((void**)&tm1_, sizeof(cuComplex)*N));
 	CUDA_CHECK(cudaMalloc((void**)&tm2_, sizeof(cuComplex)*N));
@@ -258,8 +270,10 @@ cv::Rect KCFTracker::update(cv::Mat image)
 
     float peak_value;
     cv::Point2f res = detect(_tmpl, getFeatures(image, 0, 1.0f), peak_value);
-
+	
+	tic;
 	cv::Point2f res_gpu = detect_gpu();
+	toc("DETECT GPU");
 
     if (scale_step != 1) {
         // Test at a smaller _scale
@@ -299,7 +313,9 @@ cv::Rect KCFTracker::update(cv::Mat image)
     cv::Mat x = getFeatures(image, 0);
     train(x, interp_factor);
 
+	tic;
 	train_gpu(interp_factor);
+	toc("TRAIN_GPU");
 
     return _roi;
 }
@@ -336,6 +352,8 @@ cv::Point2f KCFTracker::detect(cv::Mat z, cv::Mat x, float &peak_value)
     p.x -= (res.cols) / 2;
     p.y -= (res.rows) / 2;
 
+	LOG(INFO) << "[p]old: " << p;
+
     return p;
 }
 
@@ -348,12 +366,42 @@ cv::Point2f KCFTracker::detect_gpu() {
 	CUFFT_CHECK(cufftExecC2C(plans_, ts1_, ts1_, CUFFT_INVERSE)); // ts1_ = ifft2(ts1_)
 	caffe_gpu_real_C(H*W, ts1_, resp);
 
-	cv::Mat res(H, W, CV_32F);
-    cv::Point2f p(0.0,0.0);
+	// float* check = (float*)std::calloc(H*W, sizeof(float));
+	// CUDA_CHECK(cudaMemcpy(check, resp, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
+	// int i; for (i=0;i<H*W;i++) {std::cout << check[i];} ; std::cout << std::endl;
 
+	cv::Mat res(H, W, CV_32F);
+    // cv::Point2f p(0.0, 0.0);
 	CUDA_CHECK(cudaMemcpy(res.data, resp, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
 
+	// LOG(INFO) << res.data[0];
+
+    cv::Point2i pi;
+    double pv;
+    cv::minMaxLoc(res, NULL, &pv, NULL, &pi);
+    float peak_value = (float) pv;
+
+	//LOG(INFO) << "detect_gpu peak value: " << peak_value;
+    //subpixel peak estimation, coordinates will be non-integer
+    cv::Point2f p((float)pi.x, (float)pi.y);
+
+	LOG(INFO)<<"log:["<<res.rows<<","<<res.cols<<"]=["<<H<<","<<W<<"]";
+	LOG(INFO)<<(float)pi.x-(float)W/2<<","<<(float)pi.y-(float)H/2;
+
+    if (pi.x > 0 && pi.x < res.cols-1) {
+        p.x += subPixelPeak(res.at<float>(pi.y, pi.x-1), peak_value, res.at<float>(pi.y, pi.x+1));
+    }
+
+    if (pi.y > 0 && pi.y < res.rows-1) {
+        p.y += subPixelPeak(res.at<float>(pi.y-1, pi.x), peak_value, res.at<float>(pi.y+1, pi.x));
+    }
+
+    p.x -= (res.cols) / 2;
+    p.y -= (res.rows) / 2;
+
 	toc("detect_gpu");
+
+	LOG(INFO) << "[p]: " << p;
 	
 	return p;
 }
@@ -506,8 +554,10 @@ void KCFTracker::createGaussianProb() {
             res(i, j) = std::exp(mult * (float) (ih * ih + jh * jh));
         }
 
-	CUDA_CHECK(cudaMemcpy2D(probf, sizeof(cuComplex), res.data, 
-			sizeof(float), sizeof(float), H*W, cudaMemcpyHostToDevice));
+	// CUDA_CHECK(cudaMemcpy2D(probf, sizeof(cuComplex), res.data, 
+	// 		sizeof(float), sizeof(float), H*W, cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMemcpy(tf1_, res.data, sizeof(float)*H*W, cudaMemcpyHostToDevice));
+	caffe::caffe_gpu_cpy_R2C(H*W, tf1_, probf);
 	CUFFT_CHECK(cufftExecC2C(plans_, probf, probf, CUFFT_FORWARD));
 }
 
@@ -578,9 +628,12 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
 	// void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
     if (CONV_FEAT) {
 		//tic;
+		tic;
 		cnn.input_blobs()[0]->Reshape(1, z.channels(), z.rows, z.cols);
 		// cnn.Reshape();
         trans.Transform(z, cnn.input_blobs()[0]);
+		// LOG(INFO) << "input: " << cnn.input_blobs()[0]->data_at(0,0,0,0);
+		// LOG(INFO) << "param: " << cnn.layers()[1]->blobs()[0]->data_at(0,0,0,0);
 		// toc("input"); tic;
 		cnn.Forward();
 		// toc("forward"); tic;
@@ -593,16 +646,27 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
 			LOG(INFO) << "output shape : " <<1<<"*"<<C<<"*"<<H<<"*"<<W;
 			// init_fft_plan();
 			allocate(); // allocate memory space
-			tic;
+			// tic;
 			createHanningWindow();
-			toc("inithann");
+			// toc("inithann");
 		}
-		// realToComplex(cnn.output_blobs()[0]->gpu_data(), N, conv_feature);
 
-		CUDA_CHECK(cudaMemcpy2D(conv_feature, sizeof(cuComplex), cnn.output_blobs()[0]->gpu_data(), 
-				sizeof(float), sizeof(float), N, cudaMemcpyDeviceToDevice));
-		// toc("real2comp");
+		// LOG(INFO) << "asum of feature:" << cnn.output_blobs()[0]->asum_data();
 
+		// CUDA_CHECK(cudaMemcpy2D(tm1_, sizeof(cuComplex), cnn.output_blobs()[0]->gpu_data(), sizeof(float), sizeof(float), N, cudaMemcpyDeviceToDevice));
+		// CUDA_CHECK(cudaMemcpy(tf1_, cnn.output_blobs()[0]->gpu_data(), sizeof(float)*N, cudaMemcpyDeviceToDevice));
+		caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+		caffe::caffe_gpu_mul_C(N, tm1_, hann_window, conv_feature);
+		// float* check = complexToReal(conv_feature, N);
+		// caffe::caffe_gpu_real_C(N, conv_feature, tf1_);
+		// float* check = (float*)std::calloc(N, sizeof(float));
+		// CUDA_CHECK(cudaMemcpy(check, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+		// int i;
+		//for (i=0;i<N;i++)
+		//	std::cout << " " << check[i];
+
+		//std::cout << std::endl;
+		toc("GET CONV FEATURE");
     }
 
     // HOG features
@@ -713,6 +777,7 @@ void KCFTracker::createHanningMats()
 
 // TODO GPU
 void KCFTracker::createHanningWindow() {
+	using namespace caffe;
 	tic;
     cv::Mat hann1t = cv::Mat(cv::Size(H,1), CV_32F, cv::Scalar(0));
     cv::Mat hann2t = cv::Mat(cv::Size(1,W), CV_32F, cv::Scalar(0)); 
@@ -734,8 +799,9 @@ void KCFTracker::createHanningWindow() {
 	LOG(INFO) << "hanning !!!" << hann.rows << "*" << hann.cols;
 	toc("hanning window took");
 
-	CUDA_CHECK(cudaMemcpy2D(hann_window, sizeof(cuComplex), hann.data, 
-			sizeof(float), sizeof(float), N, cudaMemcpyHostToDevice));
+	//CUDA_CHECK(cudaMemcpy2D(hann_window, sizeof(cuComplex), hann.data, sizeof(float), sizeof(float), N, cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMemcpy(tf1_, hann.data, sizeof(float)*N, cudaMemcpyHostToDevice));
+	caffe_gpu_cpy_R2C(N, tf1_, hann_window);
 }
 
 // Calculate sub-pixel peak for one dimension

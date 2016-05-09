@@ -179,6 +179,8 @@ inline void caffe_gpu_memset(const size_t N, const int alpha, void* X) {
 #endif
 }
 // ZHOUYZ complex support
+// real to complex
+void caffe_gpu_cpy_R2C(const int N, const float* src, cuComplex* dst);
 // set
 void caffe_gpu_set_C(const int N, const cuComplex alpha, cuComplex* dst);
 // real(a)

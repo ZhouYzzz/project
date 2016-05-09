@@ -186,6 +186,7 @@ private:
 	cufftHandle plans_;
 	cublasHandle_t handle_;
 
+	float* tf1_;
 	cuComplex* tm1_;
 	cuComplex* tm2_;
 	cuComplex* tm3_;
