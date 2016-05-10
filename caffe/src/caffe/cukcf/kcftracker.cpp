@@ -132,7 +132,7 @@ KCFTracker::KCFTracker(std::string model, std::string weights, caffe::Transforma
 
     // Parameters equal in all cases
     lambda = 0.0001;
-	lambdaC = make_cuFloatComplex(0.1, 0);
+	lambdaC = make_cuFloatComplex(0.01, 0);
     padding = 2.5; 
     //output_sigma_factor = 0.1;
     output_sigma_factor = 0.125;
@@ -277,7 +277,7 @@ cv::Rect KCFTracker::update(cv::Mat image)
 	
 	tic;
 	getConvFeature(image, 0, 1.0f);
-	cv::Point2f gpu_res = detect_gpu();
+	cv::Point2f res_gpu = detect_gpu();
 	toc("DETECT GPU");
 
     if (scale_step != 1) {
@@ -305,10 +305,14 @@ cv::Rect KCFTracker::update(cv::Mat image)
         }
     }
 
+
     // Adjust by cell size and _scale
 	// LOG(INFO) << "scale:" << _scale;
-    _roi.x = cx - _roi.width / 2.0f + ((float) res.x * cell_size * _scale);
+    // TODO !!!!!! changed here
+	_roi.x = cx - _roi.width / 2.0f + ((float) res.x * cell_size * _scale);
     _roi.y = cy - _roi.height / 2.0f + ((float) res.y * cell_size * _scale);
+	//_roi.x = cx - _roi.width / 2.0f + ((float) res.x * 1 * _scale);
+    //_roi.y = cy - _roi.height / 2.0f + ((float) res.y * 1 * _scale);
 
     if (_roi.x >= image.cols - 1) _roi.x = image.cols - 1;
     if (_roi.y >= image.rows - 1) _roi.y = image.rows - 1;
@@ -371,12 +375,12 @@ cv::Point2f KCFTracker::detect(cv::Mat z, cv::Mat x, float &peak_value)
 cv::Point2f KCFTracker::detect_gpu() {
 	tic;
 	using namespace caffe;
-	linearCorrelation(tmpl, conv_feature, k);
+	linearCorrelation(conv_feature, tmpl, k);
 	// CUFFT_CHECK(cufftExecC2C(plans_, k, k, CUFFT_FORWARD));
 	caffe_gpu_mul_C(H*W, k, alphaf, ts1_);
 	CUFFT_CHECK(cufftExecC2C(plans_, ts1_, ts1_, CUFFT_INVERSE)); // ts1_ = ifft2(ts1_)
 	// scale by 1/N
-	float fac = 1.0/N;
+	float fac = 1.0/H*W;
 	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fac, ts1_, 1)); // scale by (1-factor)
 	
 	caffe_gpu_real_C(H*W, ts1_, resp);
@@ -447,11 +451,9 @@ void KCFTracker::train_gpu(float train_interp_factor) {
 	float onemin_factor = 1-train_interp_factor;
 	cuComplex factor = make_cuFloatComplex(train_interp_factor, 0);
 	CUBLAS_CHECK(cublasCsscal(handle_, N, &onemin_factor, tmpl, 1)); // scale by (1-factor)
-	CUBLAS_CHECK(cublasCsscal(handle_, H*W,&onemin_factor, ts2_, 1)); // scale by (1-factor)
-	CUBLAS_CHECK(cublasCaxpy(handle_, N, &factor,
-		conv_feature, 1, tmpl, 1));
-	CUBLAS_CHECK(cublasCaxpy(handle_, H*W, &factor,
-		ts2_, 1, alphaf, 1)); // alphaf += factor * alphaf_
+	CUBLAS_CHECK(cublasCsscal(handle_, H*W,&onemin_factor, alphaf, 1)); // scale by (1-factor)
+	CUBLAS_CHECK(cublasCaxpy(handle_, N, &factor, conv_feature, 1, tmpl, 1)); // tmpl += factor * convfeature
+	CUBLAS_CHECK(cublasCaxpy(handle_, H*W, &factor, ts2_, 1, alphaf, 1)); // alphaf += factor * alphaf_
 	toc("train_gpu");
 }
 
@@ -729,7 +731,7 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
     cv::Mat FeaturesMap;  
     cv::Mat z = RectTools::subwindow(image, extracted_roi, cv::BORDER_REPLICATE);
     
-	LOG(INFO) << "EXTRA ROI: "<< extracted_roi;
+	// LOG(INFO) << "EXTRA ROI: "<< extracted_roi;
     
 	if (z.cols != _tmpl_sz.width || z.rows != _tmpl_sz.height) {
         cv::resize(z, z, _tmpl_sz);
@@ -816,25 +818,28 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
 	//
 	//
 	//
-	//cnn.input_blobs()[0]->Reshape(1, z.channels(), z.rows, z.cols);
-    //trans.Transform(z, cnn.input_blobs()[0]);
-	//cnn.Forward();
-	//if (inithann) { // means first time
-	//	LOG(INFO) << "input shape : " <<1<<"*"<<z.channels()<<"*"<<z.rows<<"*"<<z.cols;
-	//	C = cnn.output_blobs()[0]->channels();
-	//	H = cnn.output_blobs()[0]->height();
-	//	W = cnn.output_blobs()[0]->width();
-	//	N = C * H * W;
-	//	LOG(INFO) << "output shape : " <<1<<"*"<<C<<"*"<<H<<"*"<<W;
-	//	allocate(); // allocate memory space
-	//	createHanningWindow();
-	//}
+	// cnn.input_blobs()[0]->Reshape(1, z.channels(), z.rows, z.cols);
+    // trans.Transform(z, cnn.input_blobs()[0]);
+	// cnn.Forward();
+	// if (inithann) { // means first time
+	// 	LOG(INFO) << "input shape : " <<1<<"*"<<z.channels()<<"*"<<z.rows<<"*"<<z.cols;
+	// 	C = cnn.output_blobs()[0]->channels();
+	// 	H = cnn.output_blobs()[0]->height();
+	// 	W = cnn.output_blobs()[0]->width();
+	// 	N = C * H * W;
+	// 	LOG(INFO) << "output shape : " <<1<<"*"<<C<<"*"<<H<<"*"<<W;
+	// 	allocate(); // allocate memory space
+	// 	createHanningWindow();
+	// }
 
-	//caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
-	//caffe::caffe_gpu_mul_C(N, tm1_, hann_window, conv_feature);
-	//CHECK_EQ(FeaturesMap.rows, H); CHECK_EQ(FeaturesMap.cols, W);
-	//caffe::caffe_gpu_real_C(N, conv_feature, tf1_);
-	//CUDA_CHECK(cudaMemcpy(FeaturesMap.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+	// caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+	// caffe::caffe_gpu_mul_C(N, tm1_, hann_window, conv_feature);
+	// CHECK_EQ(FeaturesMap.rows, H); CHECK_EQ(FeaturesMap.cols, W);
+	// caffe::caffe_gpu_real_C(N, conv_feature, tf1_);
+
+	// FeaturesMap = cv::Mat();
+
+	// CUDA_CHECK(cudaMemcpy(FeaturesMap.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
 
     return FeaturesMap;
 }

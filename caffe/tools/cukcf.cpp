@@ -11,11 +11,11 @@
 #include "opencv2/opencv.hpp"
 
 #include <cstdio>
-DEFINE_string(model, "net/metric_split_cuhk03/feat.prototxt",
+DEFINE_string(model, "SqueezeNet_v1.0/feat.prototxt",
     "The model definition protocol buffer text file.");
-DEFINE_string(weights, "net/metric_split_cuhk03/snapshots/train_val_iter_10000.caffemodel",
+DEFINE_string(weights, "SqueezeNet_v1.0/squeezenet_v1.0.caffemodel",
     "the pretrained weights to for testing.");
-
+//-model SqueezeNet_v1.0/feat.prototxt -weights SqueezeNet_v1.0/squeezenet_v1.0.caffemodel
 
 using caffe::Caffe;
 using namespace cv;
