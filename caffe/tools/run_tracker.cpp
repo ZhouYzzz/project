@@ -12,6 +12,8 @@
 #include "cuComplex.h"
 #include "cufft.h"
 
+#include <cstdio>
+
 DEFINE_string(model, "SqueezeNet_v1.0/feat.prototxt",
     "The model definition protocol buffer text file.");
 DEFINE_string(weights, "SqueezeNet_v1.0/squeezenet_v1.0.caffemodel",
@@ -22,32 +24,32 @@ DEFINE_string(vedio, "bolt",
 using namespace cv;
 using namespace std;
 
-Size2i get_search_window(Size2i, Size2i, Size2i);
+Size2i get_search_window(Size2i, Size2i);
 
 int main(int argc, char** argv)
 {
     FLAGS_alsologtostderr = 1;
 
     caffe::GlobalInit(&argc, &argv);
-    caffe::Caffe::set_mode(Caffe::GPU);
+    caffe::Caffe::set_mode(caffe::Caffe::GPU);
     caffe::Caffe::SetDevice(1);
 
-    caffe::Net net(model, caffe::TEST);
+    // caffe::Net<float> net(FLAGS_model, caffe::TEST);
 
     // ===================
     // Environment setting
     // ===================
-
-    string vedio_path = boost::format{"database/vot2013/%s/"}%FLAGS_vedio;
+	
+    string vedio_path = "database/vot2013/"+FLAGS_vedio+"00000001.jpg";
     Size2i target_sz(25, 60);
-    Mat im = imread(name, CV_LOAD_IMAGE_COLOR);
+    Mat im = imread(vedio_path, CV_LOAD_IMAGE_COLOR);
     Size2i im_sz(im.cols, im.rows);
     Size2i window_sz = get_search_window(target_sz, im_sz);
     LOG(INFO) << window_sz;
 }
 
 Size2i get_search_window(Size2i target_sz, Size2i im_sz) {
-    Size_ window_sz();
+    Size2i window_sz;
     if (target_sz.height / target_sz.width > 2) {
         // large height
         window_sz.height = target_sz.height * 1.4;
@@ -61,6 +63,6 @@ Size2i get_search_window(Size2i target_sz, Size2i im_sz) {
         window_sz.height = target_sz.height * 2.8;
         window_sz.width = target_sz.width * 2.8;
     }
-    return Size_<int>(window_sz);
+    return window_sz;
 }
 
