@@ -13,6 +13,8 @@ from cv2 import imread, resize, imwrite
 
 from .net import reid, get_feature
 
+import numpy as np
+
 import random
 import string
 
@@ -57,8 +59,8 @@ def add_to_database(request):
     except:
         return bad_request(request, 'bad_request.html')
 
-    path, feature = savefile(image, name)
-    create_person(name, path, feature)
+    path, feature_path = savefile(image, name)
+    create_person(name, path, feature_path)
     return redirect('/reid/')
 
 def savefile(image, name):
@@ -68,16 +70,22 @@ def savefile(image, name):
     else:
         image = resize(image, (128,256))
         pass
-    feature = get_feature(image)
-    relative_path = '/static/reid_person/'+name+id_generator()+'.jpg'
+    filename = name+'_'+id_generator()
+    # save image file for display
+    relative_path = '/static/reid_person/'+filename+'.jpg'
     abs_path = BASE_DIR + relative_path
-    # print abs_path
     imwrite(abs_path, image)
-    return relative_path, feature
+    # save feature to npy file
+    feature = get_feature(image)
+    feature_relative_path = '/static/reid_feature/'+filename+'.npy'
+    feature_path = BASE_DIR + feature_relative_path
+    np.save(feature_path, feature)
 
-def create_person(name, path, feature):
+    return relative_path, feature_relative_path
+
+def create_person(name, path, feature_path):
     # print path
-    Person.objects.create(name=name, image_path=path, feature=feature.tostring())
+    Person.objects.create(name=name, image_path=path, feature=feature_path)
     return
 
 """ Delete from database, protected """
