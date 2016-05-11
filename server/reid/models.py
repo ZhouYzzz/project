@@ -9,5 +9,6 @@ class Person(models.Model):
     name = models.CharField(max_length=20)
     # upload = models.FileField()
     image_path = models.CharField(max_length=40, blank=True)
+    feature = models.CharField(max_length=int(1e4))
     def __str__(self):
         return self.name

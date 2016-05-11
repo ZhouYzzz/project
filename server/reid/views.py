@@ -11,6 +11,8 @@ from skimage.io import imread, imsave
 from skimage.transform import resize
 from cv2 import imread, resize, imwrite
 
+from .net import reid, get_feature
+
 import random
 import string
 
@@ -55,8 +57,8 @@ def add_to_database(request):
     except:
         return bad_request(request, 'bad_request.html')
 
-    path = savefile(image, name)
-    create_person(name, path)
+    path, feature = savefile(image, name)
+    create_person(name, path, feature)
     return redirect('/reid/')
 
 def savefile(image, name):
@@ -66,15 +68,16 @@ def savefile(image, name):
     else:
         image = resize(image, (128,256))
         pass
+    feature = get_feature(image)
     relative_path = '/static/reid_person/'+name+id_generator()+'.jpg'
     abs_path = BASE_DIR + relative_path
     # print abs_path
     imwrite(abs_path, image)
-    return relative_path
+    return relative_path, feature
 
-def create_person(name, path):
+def create_person(name, path, feature):
     # print path
-    Person.objects.create(name=name, image_path=path)
+    Person.objects.create(name=name, image_path=path, feature=feature.tostring())
     return
 
 """ Delete from database, protected """
