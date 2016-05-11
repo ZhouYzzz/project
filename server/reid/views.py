@@ -23,7 +23,7 @@ def id_generator(size=3, chars=string.ascii_uppercase + string.digits):
 # Create your views here.
 
 def index(request):
-    context = {'persons': Person.objects.all()}
+    context = {'persons': reversed(Person.objects.all())}
     return render(request, 'reid.html', context)
 
 def new_person(request):
