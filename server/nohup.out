@@ -9324,3 +9324,31 @@ I0511 15:22:26.310684 90942 net.cpp:752] Ignoring source layer pair/1/norm
 I0511 15:22:26.310690 90942 net.cpp:752] Ignoring source layer pair/2/ip1
 I0511 15:22:26.310696 90942 net.cpp:752] Ignoring source layer pair/2/norm
 I0511 15:22:26.310703 90942 net.cpp:752] Ignoring source layer loss
+[11/May/2016 16:15:17] "GET /reid/ HTTP/1.1" 200 4728
+[11/May/2016 16:15:17] "GET /static/bootstrap/css/bootstrap.min.css HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/images/128x256 HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/011_WT1.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/zhouyz_5PS.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/HAHAH_7QA.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/001_45Q.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/bootstrap/js/bootstrap.min.js HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/849_JXY.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/RE_5KR.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/A1_JEU.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/868_S91.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/850_P0N.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/TEST_8YT.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:17] "GET /static/reid_person/Quora_4R2.jpg HTTP/1.1" 304 0
+[11/May/2016 16:15:34] "GET /reid/new_person/ HTTP/1.1" 200 2139
+[11/May/2016 16:15:46] "GET /reid/new_person/ HTTP/1.1" 200 2139
+[11/May/2016 16:16:02] "GET /reid/new_person/ HTTP/1.1" 200 2139
+[11/May/2016 16:16:16] "POST /reid/add_to_database/ HTTP/1.1" 302 0
+[11/May/2016 16:16:16] "GET /reid/ HTTP/1.1" 200 4963
+[11/May/2016 16:16:16] "GET /static/reid_person/AAA_QTJ.jpg HTTP/1.1" 200 8486
+[11/May/2016 16:16:22] "GET /reid/identification/ HTTP/1.1" 200 1971
+[11/May/2016 16:16:38] "POST /reid/req_to_database/ HTTP/1.1" 200 14
+[11/May/2016 16:16:51] "GET /reid/ HTTP/1.1" 200 4963
+[11/May/2016 16:16:51] "GET /static/reid_person/AAA_QTJ.jpg HTTP/1.1" 304 0
+[11/May/2016 16:16:56] "GET /detection/ HTTP/1.1" 200 1570
+[11/May/2016 16:16:57] "GET /reid/ HTTP/1.1" 200 4963
+[11/May/2016 16:16:57] "GET /static/reid_person/AAA_QTJ.jpg HTTP/1.1" 304 0

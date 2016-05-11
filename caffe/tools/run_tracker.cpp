@@ -12,6 +12,10 @@
 
 #include <cstdio>
 
+#include "caffe/cukcf/recttools.hpp"
+
+#define CUFFT_CHECK(condition) do{cufftResult result=condition;CHECK_EQ(result,CUFFT_SUCCESS)<<" "<<result;}while(0)
+
 DEFINE_string(model, "SqueezeNet_v1.0/feat.prototxt",
     "The model definition protocol buffer text file.");
 DEFINE_string(weights, "SqueezeNet_v1.0/squeezenet_v1.0.caffemodel",
@@ -23,6 +27,10 @@ using namespace cv;
 using namespace std;
 
 Size2i get_search_window(Size2i, Size2i);
+cv::Mat createGaussianPeak(int H, int W);
+cv::Mat createHanningMats(int C, int H, int W);  
+void extract_feature(Mat im, Point2f pos, Size2i window_sz, caffe::Net<float>* cnn, caffe::DataTransformer<float>* trans);
+float subPixelPeak(float left, float center, float right);
 
 int main(int argc, char** argv)
 {
@@ -32,8 +40,11 @@ int main(int argc, char** argv)
     caffe::Caffe::set_mode(caffe::Caffe::GPU);
     caffe::Caffe::SetDevice(1);
 
-    // caffe::Net<float> net(FLAGS_model, caffe::TEST);
-    // net.CopyTrainedLayersFrom(FLAGS_weights);
+	caffe::Net<float> cnn(FLAGS_model, caffe::TEST);
+    cnn.CopyTrainedLayersFrom(FLAGS_weights);
+	//
+	caffe::TransformationParameter param;
+	caffe::DataTransformer<float> trans(param, caffe::TEST);
 
     // ===================
     // Environment setting
@@ -47,6 +58,188 @@ int main(int argc, char** argv)
 	LOG(INFO) << "target_sz:" << target_sz << "im_sz:" << im_sz;
     Size2i window_sz = get_search_window(target_sz, im_sz);
     LOG(INFO) << window_sz;
+	Rect roi(336,165,25,60);
+	Point2f pos(336.0+25.0/2, 165.0+60.0/2);
+
+	int C, H, W, N;
+
+	cnn.input_blobs()[0]->Reshape(1, 3, window_sz.height, window_sz.width);
+	cnn.Reshape();
+	// cnn.output_blobs()[0]->shape()[0]
+	C = cnn.output_blobs()[0]->channels();
+	H = cnn.output_blobs()[0]->height();
+	W = cnn.output_blobs()[0]->width();
+	N = C * H * W;
+	LOG(INFO) << C << " " << H << " " << W;
+	LOG(INFO) << window_sz;
+
+	Mat prob_ = createGaussianPeak(H, W);
+	Mat hann_ = createHanningMats(C, H, W);
+	// ============
+	// MEM SPACE
+	// ============
+	cufftHandle planm_;
+	cufftHandle plans_;
+	cublasHandle_t handle_;
+
+	float* tf1_;
+	cuComplex* tm1_;
+	cuComplex* tm2_;
+	cuComplex* tm3_;
+	cuComplex* ts1_;
+	cuComplex* ts2_;
+	cuComplex* ts3_;
+
+	cuComplex one_;
+	cuComplex zero_;
+	cuComplex lambda_;
+	cuComplex* ones_;
+	cuComplex* null_;
+
+	cuComplex* probf;
+	cuComplex* alphaf;
+	cuComplex* xf;
+	cuComplex* zf;
+	cuComplex* feat;
+	cuComplex* hann;
+	float* resp;
+
+	one_ = make_cuFloatComplex(1.0, 0.0);
+	zero_ = make_cuFloatComplex(0.0, 0.0);
+	lambda_ = make_cuFloatComplex(0.0001, 0.0);
+	CUDA_CHECK(cudaMalloc((void**)&null_, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&ones_, sizeof(cuComplex)*C));
+	caffe::caffe_gpu_set_C(C, one_, ones_);
+
+	CUDA_CHECK(cudaMalloc((void**)&feat, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&hann, sizeof(cuComplex)*N));
+
+	CUDA_CHECK(cudaMalloc((void**)&probf, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&xf, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&zf, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&alphaf, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&resp, sizeof(float)*H*W));
+
+	CUDA_CHECK(cudaMalloc((void**)&tf1_, sizeof(float)*N));
+															
+	CUDA_CHECK(cudaMalloc((void**)&tm1_, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&tm2_, sizeof(cuComplex)*N));
+	CUDA_CHECK(cudaMalloc((void**)&tm3_, sizeof(cuComplex)*N));
+
+	CUDA_CHECK(cudaMalloc((void**)&ts1_, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&ts2_, sizeof(cuComplex)*H*W));
+	CUDA_CHECK(cudaMalloc((void**)&ts3_, sizeof(cuComplex)*H*W));
+
+	handle_ = caffe::Caffe::cublas_handle();
+	int shape[2] = {H, W};
+	CUFFT_CHECK(cufftPlanMany(&planm_, 2, shape, NULL, 1, H*W, NULL, 1, H*W, CUFFT_C2C, C));
+	CUFFT_CHECK(cufftPlan2d(&plans_, H, W, CUFFT_C2C));
+
+	CUDA_CHECK(cudaMemcpy(tf1_, hann_.data, sizeof(float)*N, cudaMemcpyHostToDevice));
+	caffe::caffe_gpu_cpy_R2C(N, tf1_, hann);
+	CUDA_CHECK(cudaMemcpy(tf1_, prob_.data, sizeof(float)*H*W, cudaMemcpyHostToDevice));
+	caffe::caffe_gpu_cpy_R2C(H*W, tf1_, probf);
+	CUFFT_CHECK(cufftExecC2C(plans_, probf, probf, CUFFT_FORWARD));
+
+
+
+	// ============
+	// GLOBAL VARS
+	// ============
+
+	// ============
+	// RUN TRACKER
+	// ============
+	
+	int frame = 1;
+	LOG(INFO) << "[Frame]: " << frame;
+	sprintf(im_name, "/%08d.jpg", frame);
+	im = imread(vedio_path+string(im_name), CV_LOAD_IMAGE_COLOR);
+
+	extract_feature(im, pos, window_sz, &cnn, &trans);
+	caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+	caffe::caffe_gpu_mul_C(N, tm1_, hann, feat);
+
+	CUFFT_CHECK(cufftExecC2C(planm_, feat, xf, CUFFT_FORWARD)); // xf = fft(feat)
+
+	caffe::caffe_gpu_mul_cjC(N, xf, xf, tm1_);
+	CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm1_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
+	float f = 1.0/(N*H*W);
+	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1));
+	
+	caffe::caffe_gpu_add_scalar_C(H*W, ts1_, lambda_, ts2_); // fft(k)+lambda
+	caffe::caffe_gpu_div_C(H*W, probf, ts2_, alphaf); // alphaf = probf / fft(k)+lambda
+
+
+	for (frame=2; frame<340; frame++) {
+		// LOG(INFO) << "[Frame]: " << frame;
+		sprintf(im_name, "/%08d.jpg", frame);
+		im = imread(vedio_path+string(im_name), CV_LOAD_IMAGE_COLOR);
+
+		extract_feature(im, pos, window_sz, &cnn, &trans);
+		caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+		caffe::caffe_gpu_mul_C(N, tm1_, hann, feat);
+
+		CUFFT_CHECK(cufftExecC2C(planm_, feat, zf, CUFFT_FORWARD)); // zf = fft(feat)
+
+		caffe::caffe_gpu_mul_cjC(N, xf, zf, tm1_);
+		CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm1_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
+		CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1));
+
+		caffe::caffe_gpu_mul_C(H*W, ts1_, alphaf, ts2_);
+		CUFFT_CHECK(cufftExecC2C(plans_, ts2_, ts2_, CUFFT_INVERSE));
+		float fac = 1.0/H*W;
+		CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fac, ts1_, 1)); // scale by (1-factor)
+
+		
+		caffe::caffe_gpu_real_C(H*W, ts2_, resp);
+
+		// TODO find location
+		cv::Mat res(H, W, CV_32F);
+		CUDA_CHECK(cudaMemcpy(res.data, resp, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
+
+		cv::Point2i pi;
+		double pv;
+		cv::minMaxLoc(res, NULL, &pv, NULL, &pi);
+		float peak_value = (float) pv;
+
+		cv::Point2f p((float)pi.x, (float)pi.y);
+		if (pi.x > 0 && pi.x < W-1) {
+			p.x += subPixelPeak(res.at<float>(pi.y, pi.x-1), peak_value, res.at<float>(pi.y, pi.x+1));
+		}
+
+		if (pi.y > 0 && pi.y < H-1) {
+			p.y += subPixelPeak(res.at<float>(pi.y-1, pi.x), peak_value, res.at<float>(pi.y+1, pi.x));
+		}
+		p.x -= W / 2.0;
+		p.y -= H / 2.0;
+		pos.x += 4.0*p.x;
+		pos.y += 4.0*p.y;
+		LOG(INFO) <<"Frame:"<<frame <<";"<< p.x << "," << p.y << " pos: " << pos.x << "," << pos.y<<"peak"<<peak_value;
+		// TODO find location
+
+		extract_feature(im, pos, window_sz, &cnn, &trans);
+		caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+		caffe::caffe_gpu_mul_C(N, tm1_, hann, feat);
+	
+		CUFFT_CHECK(cufftExecC2C(planm_, feat, tm1_, CUFFT_FORWARD)); // tm1_ = xf = fft(feat)
+
+		caffe::caffe_gpu_mul_cjC(N, tm1_, tm1_, tm2_);
+		CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm2_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
+		CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1));
+	
+		caffe::caffe_gpu_add_scalar_C(H*W, ts1_, lambda_, ts2_); // fft(k)+lambda
+		caffe::caffe_gpu_div_C(H*W, probf, ts2_, ts1_); // alphaf = probf / fft(k)+lambda // alphaf = ts1_
+
+		// update model
+		float train_interp_factor = 0.01;
+		float onemin_factor = 1-train_interp_factor;
+		cuComplex factor = make_cuFloatComplex(train_interp_factor, 0);
+		CUBLAS_CHECK(cublasCsscal(handle_, N, &onemin_factor, xf, 1)); // scale by (1-factor)
+		CUBLAS_CHECK(cublasCsscal(handle_, H*W,&onemin_factor, alphaf, 1)); // scale by (1-factor)
+		CUBLAS_CHECK(cublasCaxpy(handle_, N, &factor, tm1_, 1, xf, 1)); // tmpl += factor * convfeature
+		CUBLAS_CHECK(cublasCaxpy(handle_, H*W, &factor, ts1_, 1, alphaf, 1)); // alphaf += factor * alphaf_
+	}
 }
 
 // ==============
@@ -77,8 +270,7 @@ cv::Mat createGaussianPeak(int H, int W) {
     float output_sigma = sqrt((float) W * H) / 2 * 0.125;// padding, output_sigma_factor;
     float mult = -0.5 / (output_sigma * output_sigma);
     for (int i = 0; i < H; i++)
-        for (int j = 0; j < W; j++)
-        {
+        for (int j = 0; j < W; j++) {
             int ih = i - syh;
             int jh = j - sxh;
             res(i, j) = exp(mult * (float) (ih * ih + jh * jh));
@@ -86,23 +278,36 @@ cv::Mat createGaussianPeak(int H, int W) {
     return res;
 }
 
-cv::Mat createHanningMats(int H, int W) {   
+cv::Mat createHanningMats(int C, int H, int W) {   
     cv::Mat hann1t = cv::Mat(cv::Size(H,1), CV_32F, cv::Scalar(0));
     cv::Mat hann2t = cv::Mat(cv::Size(1,W), CV_32F, cv::Scalar(0)); 
-
-    for (int i = 0; i < hann1t.cols; i++)
-        hann1t.at<float > (0, i) = 0.5 * (1 - std::cos(2 * 3.14159265358979323846 * i / (hann1t.cols - 1)));
-    for (int i = 0; i < hann2t.rows; i++)
-        hann2t.at<float > (i, 0) = 0.5 * (1 - std::cos(2 * 3.14159265358979323846 * i / (hann2t.rows - 1)));
-
+    for (int i = 0; i < H; i++)
+        hann1t.at<float > (0, i) = 0.5 * (1 - std::cos(2 * 3.14159265358979323846 * i / (W - 1)));
+    for (int i = 0; i < W; i++)
+        hann2t.at<float > (i, 0) = 0.5 * (1 - std::cos(2 * 3.14159265358979323846 * i / (H - 1)));
     cv::Mat hann2d = hann2t * hann1t;
-    cv::Mat hann1d = hann2d.reshape(1,1); // Procedure do deal with cv::Mat multichannel bug
-        
-    hann = cv::Mat(cv::Size(size_patch[0]*size_patch[1], size_patch[2]), CV_32F, cv::Scalar(0));
-    for (int i = 0; i < size_patch[2]; i++) {
-        for (int j = 0; j<size_patch[0]*size_patch[1]; j++) {
+    cv::Mat hann1d = hann2d.reshape(1,1); // Procedure do deal with cv::Mat multichannel bug       
+	cv::Mat hann = cv::Mat(cv::Size(H*W, C), CV_32F, cv::Scalar(0));
+    for (int i = 0; i < C; i++)
+        for (int j = 0; j<H*W; j++)
             hann.at<float>(i,j) = hann1d.at<float>(0,j);
-        }
-    }
     return hann;
+}
+
+void extract_feature(Mat im, Point2f pos, Size2i window_sz, caffe::Net<float>* cnn, caffe::DataTransformer<float>* trans) {
+	Rect extracted_roi;
+	extracted_roi.x = int(pos.x) - window_sz.width/2;
+	extracted_roi.y = int(pos.y) - window_sz.height/2;
+	extracted_roi.width = window_sz.width;
+	extracted_roi.height = window_sz.height;
+	Mat z = RectTools::subwindow(im, extracted_roi, BORDER_REPLICATE);
+	trans->Transform(z, cnn->input_blobs()[0]);
+	cnn->Forward();
+}
+
+float subPixelPeak(float left, float center, float right) {   
+	float divisor = 2 * center - right - left;
+	if (divisor == 0)
+		return 0;   
+	return 0.5 * (right - left) / divisor;
 }
