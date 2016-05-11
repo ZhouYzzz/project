@@ -1,7 +1,5 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include "boost/format.hpp"
-
 #include "caffe/caffe.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/data_transformer.hpp"
@@ -40,21 +38,23 @@ int main(int argc, char** argv)
     // Environment setting
     // ===================
 	
-    string vedio_path = "database/vot2013/"+FLAGS_vedio+"00000001.jpg";
+    string vedio_path = "database/vot2013/"+FLAGS_vedio;
+	char im_name[20]; sprintf(im_name, "/%08d.jpg", 1);
     Size2i target_sz(25, 60);
-    Mat im = imread(vedio_path, CV_LOAD_IMAGE_COLOR);
+    Mat im = imread(vedio_path+string(im_name), CV_LOAD_IMAGE_COLOR);
     Size2i im_sz(im.cols, im.rows);
+	LOG(INFO) << "target_sz:" << target_sz << "im_sz:" << im_sz;
     Size2i window_sz = get_search_window(target_sz, im_sz);
     LOG(INFO) << window_sz;
 }
 
 Size2i get_search_window(Size2i target_sz, Size2i im_sz) {
     Size2i window_sz;
-    if (target_sz.height / target_sz.width > 2) {
+    if (target_sz.height / target_sz.width >= 2) {
         // large height
-        window_sz.height = target_sz.height * 1.4;
+        window_sz.height = target_sz.height * 2;
         window_sz.width = target_sz.width * 2.8;
-    } else if (im_sz.area() / target_sz.area() > 10) {
+    } else if (im_sz.area() / target_sz.area() <= 10) {
         // large objects
         window_sz.height = target_sz.height * 2;
         window_sz.width = target_sz.width * 2;
