@@ -9,6 +9,7 @@ from server.settings import *
 
 from skimage.io import imread, imsave
 from skimage.transform import resize
+from cv2 import imread, resize, imwrite
 
 import random
 import string
@@ -49,9 +50,11 @@ def add_to_database(request):
     try:
         name = request.POST['name']
         file = request.FILES['upload']
-        image = imread(file)
+        image = imread(file.temporary_file_path())
+        assert image is not None
     except:
         return bad_request(request, 'bad_request.html')
+
     path = savefile(image, name)
     create_person(name, path)
     return redirect('/reid/')
@@ -61,16 +64,17 @@ def savefile(image, name):
     if image.shape == (256,128,3):
         pass
     else:
-        image = resize(image, (256,128))
+        image = resize(image, (128,256))
         pass
     relative_path = '/static/reid_person/'+name+id_generator()+'.jpg'
     abs_path = BASE_DIR + relative_path
-    print image
-    imsave(image, abs_path)
+    # print abs_path
+    imwrite(abs_path, image)
     return relative_path
 
 def create_person(name, path):
-    Person.objects.create(name=name, path=path)
+    # print path
+    Person.objects.create(name=name, image_path=path)
     return
 
 """ Delete from database, protected """
