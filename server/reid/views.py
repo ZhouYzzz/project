@@ -14,6 +14,7 @@ from cv2 import imread, resize, imwrite
 from .net import reid, get_feature
 
 import numpy as np
+from numpy.linalg import norm
 
 import random
 import string
@@ -36,6 +37,26 @@ def identification(request):
 # def new(request):
 #     return render(request, 'reid/new.html')
 
+def gallery():
+    for person in Person.objects.all():
+        id = person.id
+        f = np.load(person.feature, np.float) # get feature array from path
+        try:
+            ids = np.append(ids,id)
+            features = np.vstack(features, f)
+        except:
+            ids = np.array(id)
+            features = f
+    return features, ids
+
+def compare_to_gallery(feature):
+    gallery_feats, ids = gallery()
+    distance = norm(gallery_feats - feature, ord=2, axis=1)
+    argsort = distance.argsort()
+    rank = ids[argsort]
+    dist = distance[argsort]
+    return rank, dist
+
 # @csrf_exempt
 # def delete(request):
 #     Person.objects.create(name=request.POST['name'])
@@ -46,7 +67,18 @@ def identification(request):
 """ Re-identify posted image """
 @csrf_exempt
 def req_to_database(request):
-    pass
+    try:
+        file = request.FILES['upload']
+        image = imread(file.temporary_file_path())
+        assert image is not None
+    except:
+        return bad_request(request, 'bad_request.html')
+
+    if image.shape != (256,128,3):
+        image = resize(image, (128,256))
+    feature = get_feature(image)
+    id_rank, dist = compare_to_gallery(feature)
+    return id_rank, dist, Person.objects.get(id=id_rank[0]).name
 
 """ Add new person to database """
 @csrf_exempt
