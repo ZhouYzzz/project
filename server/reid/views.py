@@ -40,10 +40,10 @@ def identification(request):
 def gallery():
     for person in Person.objects.all():
         id = person.id
-        f = np.load(person.feature, np.float) # get feature array from path
+        f = np.load(BASE_DIR+person.feature) # get feature array from path
         try:
             ids = np.append(ids,id)
-            features = np.vstack(features, f)
+            features = np.vstack((features, f))
         except:
             ids = np.array(id)
             features = f
@@ -78,7 +78,7 @@ def req_to_database(request):
         image = resize(image, (128,256))
     feature = get_feature(image)
     id_rank, dist = compare_to_gallery(feature)
-    return id_rank, dist, Person.objects.get(id=id_rank[0]).name
+    return HttpResponse(Person.objects.get(id=id_rank[0]).name+str(dist[0]))
 
 """ Add new person to database """
 @csrf_exempt

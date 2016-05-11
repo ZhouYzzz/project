@@ -1,6 +1,12 @@
 # environ specified config file
 *.cfg
 
+# nohup
+nohup.out
+
+# database
+*.sqlite3
+
 # image file
 *.jpg
 *.jpeg
