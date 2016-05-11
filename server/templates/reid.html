@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block body %}
+<div class="container">
+  <div class="page-header">
+    <h2>Re-identification</h2>
+    <p class="lead">by Yizhuang ZHOU, Tsinghua univ.</p>
+  </div>
+</div>
+<div class="container">
+  <div class="row">
+      <div class="col-lg-2 col-md-3 col-sm-4 col-xs-6 thumb">
+      <a class="thumbnail" href="identification/">
+        <img class="img-responsive" src="/static/images/128x256">
+        <center><b>IDENTIFICATION</b></center>
+      </a>
+    </div>
+    <div class="col-lg-2 col-md-3 col-sm-4 col-xs-6 thumb">
+      <a class="thumbnail" href="new_person/">
+        <img class="img-responsive" src="/static/images/128x256">
+        <center><b>NEW PERSON</b></center>
+      </a>
+    </div>
+    {% for person in persons %}
+    <div class="col-lg-2 col-md-3 col-sm-4 col-xs-6 thumb">
+      <a class="thumbnail" href="#">
+        <img class="img-responsive" src="{{ person.image_path }}">
+        <center><b>{{ person.name }}</b></center>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% load staticfiles %}
+<link rel="stylesheet" type="text/css" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+
+<h1>Person Re-identification</h1>
+<h3><a href="../">index</a></h3>
+<h3><a href="../admin/">admin</a></h3>
+{% for person in persons %}
+    <li>{{ person.name }}</li>
+{% endfor %}
+<img src="{% static 'images/test.png'%}">
+<img src="/static/images/test.png">
+<h3><a href="/reid/new/">new</a></h3>
+
+<script src="{% static 'bootstrap/js/bootstrap.min.js' %}"></script>
