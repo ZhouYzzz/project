@@ -44,7 +44,7 @@ layer {
 # ================
 
 layer {
-  name: "anchor/split"
+  name: "split"
   type: "Python"
   bottom: "anchor/data"
   top: "anchor/0/data"
@@ -81,7 +81,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 2
+      stride: 1
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -130,7 +130,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 2
+      stride: 1
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -179,7 +179,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 2
+      stride: 1
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -360,11 +360,160 @@ layer {
 
 # ==============
 
+# anchor/0/conv3
+  layer {
+    name: "anchor/0/conv3"
+    type: "Convolution"
+    bottom: "anchor/0/pool2"
+    top: "anchor/0/conv3"
+    param {
+      name: "/0/conv3"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    param {
+      name: "/0/conv3_b"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    convolution_param {
+      num_output: 64
+      kernel_size: 5
+      stride: 2
+      weight_filler {
+        type: "gaussian"
+        std: 0.01
+      }
+      bias_filler {
+        type: "constant"
+        value: 0
+      }
+    }
+  }
+  layer {
+    name: "anchor/0/relu3"
+    type: "ReLU"
+    bottom: "anchor/0/conv3"
+    top: "anchor/0/conv3"
+  }
+  layer {
+    name: "anchor/0/pool3"
+    type: "Pooling"
+    bottom: "anchor/0/conv3"
+    top: "anchor/0/pool3"
+    pooling_param {
+      pool: MAX
+      kernel_size: 2
+      stride: 2
+    }
+  }
+#
+
+# anchor/1/conv3
+  layer {
+    name: "anchor/1/conv3"
+    type: "Convolution"
+    bottom: "anchor/1/pool2"
+    top: "anchor/1/conv3"
+    param {
+      name: "/1/conv3"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    param {
+      name: "/1/conv3_b"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    convolution_param {
+      num_output: 64
+      kernel_size: 5
+      stride: 2
+      weight_filler {
+        type: "gaussian"
+        std: 0.01
+      }
+      bias_filler {
+        type: "constant"
+        value: 0
+      }
+    }
+  }
+  layer {
+    name: "anchor/1/relu3"
+    type: "ReLU"
+    bottom: "anchor/1/conv3"
+    top: "anchor/1/conv3"
+  }
+  layer {
+    name: "anchor/1/pool3"
+    type: "Pooling"
+    bottom: "anchor/1/conv3"
+    top: "anchor/1/pool3"
+    pooling_param {
+      pool: MAX
+      kernel_size: 2
+      stride: 2
+    }
+  }
+#
+
+# anchor/2/conv3
+  layer {
+    name: "anchor/2/conv3"
+    type: "Convolution"
+    bottom: "anchor/2/pool2"
+    top: "anchor/2/conv3"
+    param {
+      name: "/2/conv3"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    param {
+      name: "/2/conv3_b"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    convolution_param {
+      num_output: 64
+      kernel_size: 5
+      stride: 2
+      weight_filler {
+        type: "gaussian"
+        std: 0.01
+      }
+      bias_filler {
+        type: "constant"
+        value: 0
+      }
+    }
+  }
+  layer {
+    name: "anchor/2/relu3"
+    type: "ReLU"
+    bottom: "anchor/2/conv3"
+    top: "anchor/2/conv3"
+  }
+  layer {
+    name: "anchor/2/pool3"
+    type: "Pooling"
+    bottom: "anchor/2/conv3"
+    top: "anchor/2/pool3"
+    pooling_param {
+      pool: MAX
+      kernel_size: 2
+      stride: 2
+    }
+  }
+#
+
+# ==============
+
 # anchor/0/ip1
   layer {
     name: "anchor/0/ip1"
     type: "InnerProduct"
-    bottom: "anchor/0/pool2"
+    bottom: "anchor/0/pool3"
     top: "anchor/0/ip1"
     param {
       name: "/0/ip1"
@@ -400,7 +549,7 @@ layer {
   layer {
     name: "anchor/1/ip1"
     type: "InnerProduct"
-    bottom: "anchor/1/pool2"
+    bottom: "anchor/1/pool3"
     top: "anchor/1/ip1"
     param {
       name: "/0/ip1"
@@ -436,7 +585,7 @@ layer {
   layer {
     name: "anchor/2/ip1"
     type: "InnerProduct"
-    bottom: "anchor/2/pool2"
+    bottom: "anchor/2/pool3"
     top: "anchor/2/ip1"
     param {
       name: "/0/ip1"
@@ -482,11 +631,10 @@ layer {
   }
 }
 
-# ==============
-# PAIR
+# pair
 
 layer {
-  name: "pair/split"
+  name: "split"
   type: "Python"
   bottom: "pair/data"
   top: "pair/0/data"
@@ -523,7 +671,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 2
+      stride: 1
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -572,7 +720,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 2
+      stride: 1
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -621,7 +769,7 @@ layer {
     convolution_param {
       num_output: 64
       kernel_size: 5
-      stride: 2
+      stride: 1
       weight_filler {
         type: "gaussian"
         std: 0.01
@@ -802,11 +950,160 @@ layer {
 
 # ==============
 
+# pair/0/conv3
+  layer {
+    name: "pair/0/conv3"
+    type: "Convolution"
+    bottom: "pair/0/pool2"
+    top: "pair/0/conv3"
+    param {
+      name: "/0/conv3"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    param {
+      name: "/0/conv3_b"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    convolution_param {
+      num_output: 64
+      kernel_size: 5
+      stride: 2
+      weight_filler {
+        type: "gaussian"
+        std: 0.01
+      }
+      bias_filler {
+        type: "constant"
+        value: 0
+      }
+    }
+  }
+  layer {
+    name: "pair/0/relu3"
+    type: "ReLU"
+    bottom: "pair/0/conv3"
+    top: "pair/0/conv3"
+  }
+  layer {
+    name: "pair/0/pool3"
+    type: "Pooling"
+    bottom: "pair/0/conv3"
+    top: "pair/0/pool3"
+    pooling_param {
+      pool: MAX
+      kernel_size: 2
+      stride: 2
+    }
+  }
+#
+
+# pair/1/conv3
+  layer {
+    name: "pair/1/conv3"
+    type: "Convolution"
+    bottom: "pair/1/pool2"
+    top: "pair/1/conv3"
+    param {
+      name: "/1/conv3"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    param {
+      name: "/1/conv3_b"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    convolution_param {
+      num_output: 64
+      kernel_size: 5
+      stride: 2
+      weight_filler {
+        type: "gaussian"
+        std: 0.01
+      }
+      bias_filler {
+        type: "constant"
+        value: 0
+      }
+    }
+  }
+  layer {
+    name: "pair/1/relu3"
+    type: "ReLU"
+    bottom: "pair/1/conv3"
+    top: "pair/1/conv3"
+  }
+  layer {
+    name: "pair/1/pool3"
+    type: "Pooling"
+    bottom: "pair/1/conv3"
+    top: "pair/1/pool3"
+    pooling_param {
+      pool: MAX
+      kernel_size: 2
+      stride: 2
+    }
+  }
+#
+
+# pair/2/conv3
+  layer {
+    name: "pair/2/conv3"
+    type: "Convolution"
+    bottom: "pair/2/pool2"
+    top: "pair/2/conv3"
+    param {
+      name: "/2/conv3"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    param {
+      name: "/2/conv3_b"
+      lr_mult: 1
+      decay_mult: 0
+    }
+    convolution_param {
+      num_output: 64
+      kernel_size: 5
+      stride: 2
+      weight_filler {
+        type: "gaussian"
+        std: 0.01
+      }
+      bias_filler {
+        type: "constant"
+        value: 0
+      }
+    }
+  }
+  layer {
+    name: "pair/2/relu3"
+    type: "ReLU"
+    bottom: "pair/2/conv3"
+    top: "pair/2/conv3"
+  }
+  layer {
+    name: "pair/2/pool3"
+    type: "Pooling"
+    bottom: "pair/2/conv3"
+    top: "pair/2/pool3"
+    pooling_param {
+      pool: MAX
+      kernel_size: 2
+      stride: 2
+    }
+  }
+#
+
+# ==============
+
 # pair/0/ip1
   layer {
     name: "pair/0/ip1"
     type: "InnerProduct"
-    bottom: "pair/0/pool2"
+    bottom: "pair/0/pool3"
     top: "pair/0/ip1"
     param {
       name: "/0/ip1"
@@ -842,7 +1139,7 @@ layer {
   layer {
     name: "pair/1/ip1"
     type: "InnerProduct"
-    bottom: "pair/1/pool2"
+    bottom: "pair/1/pool3"
     top: "pair/1/ip1"
     param {
       name: "/0/ip1"
@@ -878,7 +1175,7 @@ layer {
   layer {
     name: "pair/2/ip1"
     type: "InnerProduct"
-    bottom: "pair/2/pool2"
+    bottom: "pair/2/pool3"
     top: "pair/2/ip1"
     param {
       name: "/0/ip1"
@@ -923,6 +1220,7 @@ layer {
     axis: 1
   }
 }
+
 
 # ===== LOSS =====
 
