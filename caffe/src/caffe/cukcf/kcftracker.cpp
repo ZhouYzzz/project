@@ -100,11 +100,7 @@ the use of this software, even if advised of the possibility of such damage.
 #define tic ; //t.Start();
 #define toc(msg) ; //t.Stop(); LOG(INFO) << msg << " " << t.MilliSeconds() << " ms";
 
-#define CUFFT_CHECK(condition) \
-		do { \
-			cufftResult result = condition; \
-			CHECK_EQ(result, CUFFT_SUCCESS) << " " << result; \
-		} while (0)
+#define CUFFT_CHECK(condition) do { cufftResult result = condition; CHECK_EQ(result, CUFFT_SUCCESS) << " " << result; } while (0)
 
 // void realToComplex(const float* src, int n, cuComplex* dst, bool fromdevice=true) {
 // 	if (fromdevice) {

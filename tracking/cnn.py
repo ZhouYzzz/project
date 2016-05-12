@@ -7,26 +7,31 @@ import numpy as np
 from numpy.fft import *
 from numpy import conj, exp
 from numpy.linalg import norm
+import matplotlib.pyplot as plt
 
 def main():
-    a = np.zeros([3,4,4])
-    b = a.copy()
-    a[0,0,0] = 1
-    b[0,0,1] = 2
-    b[0,0,2] = 1
-    print Gcorrelation(a,b)
-    print Lcorrelation(a,b)
+    target = np.ones([20,20])
+    a = np.zeros([100,100])
+    b = np.zeros([100,100])
+    b[4:24,4:24] = target
+    # b[10,10] = 1
+    a[40:60,40:60] = target
+    # print Gcorrelation(a,b)
+    r = Lcorrelation(a,b)
+    print r
+    plt.pcolor(r.real)
+    plt.show()
     pass
 
-def Lcorrelation(a, b):
-    c = ifft2(sum(conj(fft2(a)) * fft2(b), 0));
+def Lcorrelation(a, b): # model = a
+    c = conj(fft2(a)) * fft2(b);
     k = c
     return k
 
 def Gcorrelation(a, b, sigma=0.6):
-    c = ifft2(sum(conj(fft2(a)) * fft2(b), 0));
+    c = fftshift(ifft2(conj(fft2(a)) * fft2(b)));
     d = norm(a) + norm(b) - 2 * c;
-    k = exp(-1 / sigma**2 * abs(d) / d.size);
+    k = exp(-1 / sigma**2 * d / d.size);
     return k
 
 def train(x, interp):
