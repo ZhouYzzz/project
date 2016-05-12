@@ -24,18 +24,20 @@ DEFINE_string(weights, "",
 using namespace std;
 using namespace cv;
 
-int main(int argc, char const *argv[])
+cv::Mat createHanningMats(int C, int H, int W);
+
+int main(int argc, char** argv)
 {
     FLAGS_alsologtostderr = 1;
 
     caffe::GlobalInit(&argc, &argv);
     caffe::Caffe::set_mode(caffe::Caffe::GPU);
-    caffe::Caffe::SetDevice(1);
+    caffe::Caffe::SetDevice(2);
 
     caffe::Net<float> cnn(FLAGS_model, caffe::TEST);
     // cnn.CopyTrainedLayersFrom(FLAGS_weights);
 
-    Net.Forward();
+    cnn.Forward();
     int C, H, W, N;
     C = cnn.output_blobs()[0]->channels();
     H = cnn.output_blobs()[0]->height();
@@ -99,12 +101,78 @@ int main(int argc, char const *argv[])
     CUFFT_CHECK(cufftPlanMany(&planm_, 2, shape, NULL, 1, H*W, NULL, 1, H*W, CUFFT_C2C, C));
     CUFFT_CHECK(cufftPlan2d(&plans_, H, W, CUFFT_C2C));
 
+	Mat hann_ = createHanningMats(C, H, W);   
+	CUDA_CHECK(cudaMemcpy(tf1_, hann_.data, sizeof(float)*N, cudaMemcpyHostToDevice));
+	caffe::caffe_gpu_cpy_R2C(N, tf1_, hann);
+
+
     // TEST mat
-    Mat test(H, W, CV_32F, Scalar(C));
-    LOG(INFO) << test.channels();
+    Mat test(H, W, CV_32F);
+	// LOG(INFO) << test;
     // TEST BEGIN
 
-    caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
-    cudaMemcpy(test.data, tm1_, sizeof(float)*N, cudaMemcpyDeviceToHost);
+    caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), feat);
+	// TODO
+	//caffe::caffe_gpu_real_C(N, tm1_, tf1_);
+    //CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    //LOG(INFO) << test;
+
+
+	//caffe::caffe_gpu_mul_C(N, tm1_, ones_, feat);
+    // CUDA_CHECK(cudaMemcpy(tm1_, feat, sizeof(cuComplex)*N, cudaMemcpyDeviceToDevice));
+
+	// TODO
+	caffe::caffe_gpu_real_C(N, hann, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
     LOG(INFO) << test;
+	//
+	
+	// TODO
+	caffe::caffe_gpu_real_C(N, feat, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    LOG(INFO) << test;
+
+	CUFFT_CHECK(cufftExecC2C(planm_, feat, feat, CUFFT_FORWARD)); // xf = fft(feat)
+	
+	// TODO
+	caffe::caffe_gpu_real_C(N, feat, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    LOG(INFO) << "feat after fft" << test;
+
+	// CUFFT_CHECK(cufftExecC2C(planm_, feat, xf, CUFFT_FORWARD)); // xf = fft(feat)
+
+	caffe::caffe_gpu_mul_cjC(N, feat, feat, tm1_);
+	// TODO
+	caffe::caffe_gpu_real_C(N, tm1_, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    LOG(INFO) << "conj(xf)*xf" << test;
+	
+
+
+	CUBLAS_CHECK(cublasCgemm(handle_, CUBLAS_OP_T, CUBLAS_OP_T,
+				1, H*W, C, &one_, ones_, C, tm1_, H*W, &zero_, ts1_, 1)); // ts1_ = k
+	// TODO
+	caffe::caffe_gpu_real_C(N, ts1_, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    LOG(INFO) << "sum" << test;
+	
+
+	LOG(INFO) << "ALLLLLLLLL";
+}
+
+
+cv::Mat createHanningMats(int C, int H, int W) {   
+	cv::Mat hann1t = cv::Mat(cv::Size(H,1), CV_32F, cv::Scalar(0));
+	cv::Mat hann2t = cv::Mat(cv::Size(1,W), CV_32F, cv::Scalar(0)); 
+	for (int i = 0; i < H; i++)
+		hann1t.at<float > (0, i) = 0.5 * (1 - std::cos(2 * 3.14159265358979323846 * i / (W - 1)));
+	for (int i = 0; i < W; i++)
+		hann2t.at<float > (i, 0) = 0.5 * (1 - std::cos(2 * 3.14159265358979323846 * i / (H - 1)));
+	cv::Mat hann2d = hann2t * hann1t;
+	cv::Mat hann1d = hann2d.reshape(1,1); // Procedure do deal with cv::Mat multichannel bug       
+	cv::Mat hann = cv::Mat(cv::Size(H*W, C), CV_32F, cv::Scalar(0));
+	for (int i = 0; i < C; i++)
+		for (int j = 0; j<H*W; j++)
+			hann.at<float>(i,j) = hann1d.at<float>(0,j);
+	return hann;
 }

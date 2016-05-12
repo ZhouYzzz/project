@@ -1,7 +1,13 @@
 import caffe
 import numpy as np
 from utils import CHECK
+from numpy.fft import *
 #print 'MODEUL'
+
+C=3
+H=5
+W=5
+
 class RefLayer(caffe.Layer):
     def setup(self, bottom, top):
         #print 'HAHAAH'
@@ -14,12 +20,28 @@ class RefLayer(caffe.Layer):
     def reshape(self, bottom, top):
         #print 'NONONO'
         #top[0].reshape(*self.test_data.shape)
-        top[0].reshape(1,1,1,4)
+        top[0].reshape(1,C,H,W)
         pass
 
     def forward(self, bottom, top):
         #top[0].data[...] = self.test_data
-        top[0].data[...] = np.arange(4).reshape(1,1,1,4);
+        a = np.zeros([C,H,W])
+        a[0,1,1] = 1
+        a[0,1,2] = 1
+        a[1,1,1] = 1
+        a[2,2,2] = 1
+        #a[2,2,3] = 1
+        print a
+        af =  fft2(a)
+        c =  af.conj()*af
+        print af.real, c.real
+        s = np.sum(c, axis=0)
+        print s.real
+
+        #b = np.zeros([1,C,H,W])
+        #b[0,:,1:2,2:3] = b[0,:,1:2,2:3] + 1
+        #print b
+        top[0].data[0,:,:,:] = a
         # print 'Nothing with this'
         pass
 
