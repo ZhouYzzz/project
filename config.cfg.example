@@ -1,2 +1,3 @@
 ROOT=/path/to/project
 CAFFE=/path/to/caffe
+FASTER_RCNN=/path/to/py-faster-rcnn

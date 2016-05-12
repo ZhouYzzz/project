@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import numpy as np
 from cv2 import imread, resize
-from utils import CHECK, crop
+from util import CHECK, crop
 
 _TFP = os.path.dirname(__file__)
 

@@ -1,4 +1,4 @@
-from utils import CHECK
+from util import CHECK
 import caffe
 
 class SplitLayer(caffe.Layer):
@@ -6,7 +6,6 @@ class SplitLayer(caffe.Layer):
     def setup(self, bottom, top):
         CHECK.EQ(len(bottom), 1)
         CHECK.EQ(len(top), 3) # we spilt 1 im to 3 parts
-        print self.param_str
         self.N, self.C, self.H, self.W = bottom[0].shape
         # S -- Slice: `H`eight / 2   
         self.S = self.H / 2

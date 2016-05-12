@@ -1,6 +1,6 @@
 import caffe
 import numpy as np
-from utils import CHECK
+from util import CHECK
 from numpy.fft import *
 #print 'MODEUL'
 

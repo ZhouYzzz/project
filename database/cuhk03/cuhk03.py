@@ -2,7 +2,7 @@
 
 import numpy as np
 import os
-from utils import CHECK, crop
+from util import CHECK, crop
 from cv2 import imread
 from random import getrandbits
 

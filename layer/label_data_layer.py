@@ -1,6 +1,6 @@
 from data_layer import DataLayer
 from database import CUHK03
-from utils import CHECK
+from util import CHECK
 import numpy as np
 from time import time
 

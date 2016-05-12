@@ -1,12 +1,16 @@
+import sys
+# sys.path.remove('/home/zhouyz14/project')
+sys.path.remove('/home/zhouyz14/caffe/python')
+sys.path.append('/home/zhouyz14/py-faster-rcnn/caffe-fast-rcnn/python')
 import caffe
 import numpy as np
 
 from fast_rcnn.test import im_detect
 from fast_rcnn.config import cfg
 from fast_rcnn.nms_wrapper import nms
-
-DETECT_MODEL = '/home/zhouyz14/py-faster-rcnn/'
-DETECT_WEIGHT = '/home/zhouyz14/py-faster-rcnn/'
+# ~/py-faster-rcnn/models/coco/VGG16/faster_rcnn_end2end$ ls ../../../../data/faster_rcnn_models/VGG16_faster_rcnn_final.caffemodel
+DETECT_MODEL = '/home/zhouyz14/py-faster-rcnn/models/pascal_voc/VGG16/faster_rcnn_alt_opt/faster_rcnn_test.pt'
+DETECT_WEIGHT = '/home/zhouyz14/py-faster-rcnn/data/faster_rcnn_models/VGG16_faster_rcnn_final.caffemodel'
 
 CLASSES = ('__background__',
            'aeroplane', 'bicycle', 'bird', 'boat',
@@ -21,7 +25,12 @@ NMS_THRESH = 0.3
 # NET
 caffe.set_mode_gpu()
 caffe.set_device(1)
-net = caffe.Net(DETECT_MODEL, DETECT_WEIGHT, caffe::TEST)
+net = caffe.Net(DETECT_MODEL, DETECT_WEIGHT, caffe.TEST)
+
+# after loading, remove path change
+# sys.path.append('/home/zhouyz14/project')
+sys.path.append('/home/zhouyz14/caffe/python')
+sys.path.remove('/home/zhouyz14/py-faster-rcnn/caffe-fast-rcnn/python')
 
 # FUNCTIONS
 def high_prob(dets, thresh=0.5):

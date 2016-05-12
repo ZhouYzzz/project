@@ -1,7 +1,7 @@
 import caffe
 import numpy as np
 import pandas as pd
-from utils import CHECK
+from util import CHECK
 import matplotlib.pyplot as plt
 
 class AnalyseLayer(caffe.Layer):
