@@ -6,6 +6,8 @@
 #include "caffe/proto/caffe.pb.h"
 
 #include "opencv2/opencv.hpp"
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 
 #include "cuComplex.h"
 #include "cufft.h"
@@ -20,7 +22,7 @@ DEFINE_string(model, "SqueezeNet_v1.0/feat.prototxt",
     "The model definition protocol buffer text file.");
 DEFINE_string(weights, "SqueezeNet_v1.0/squeezenet_v1.0.caffemodel",
     "the pretrained weights to for testing.");
-DEFINE_string(vedio, "bolt",
+DEFINE_string(vedio, "woman",
     "vedio squence.");
 
 using namespace cv;
@@ -52,14 +54,15 @@ int main(int argc, char** argv)
 	
     string vedio_path = "database/vot2013/"+FLAGS_vedio;
 	char im_name[20]; sprintf(im_name, "/%08d.jpg", 1);
-    Size2i target_sz(25, 60);
+	// 207,117,29,103
+    Size2i target_sz(29, 103);
     Mat im = imread(vedio_path+string(im_name), CV_LOAD_IMAGE_COLOR);
     Size2i im_sz(im.cols, im.rows);
 	LOG(INFO) << "target_sz:" << target_sz << "im_sz:" << im_sz;
     Size2i window_sz = get_search_window(target_sz, im_sz);
     LOG(INFO) << window_sz;
-	Rect roi(336,165,25,60);
-	Point2f pos(336.0+25.0/2, 165.0+60.0/2);
+	Rect roi(207,117,29,103);
+	Point2f pos(107.0+29.0/2, 117.0+103.0/2);
 
 	int C, H, W, N;
 
@@ -150,6 +153,8 @@ int main(int argc, char** argv)
 	// ============
 	// RUN TRACKER
 	// ============
+	//
+	namedWindow( "Display window", WINDOW_AUTOSIZE );// Create a window for display.
 	
 	int frame = 1;
 	LOG(INFO) << "[Frame]: " << frame;
@@ -170,6 +175,12 @@ int main(int argc, char** argv)
 	caffe::caffe_gpu_add_scalar_C(H*W, ts1_, lambda_, ts2_); // fft(k)+lambda
 	caffe::caffe_gpu_div_C(H*W, probf, ts2_, alphaf); // alphaf = probf / fft(k)+lambda
 
+	//rectangle(Mat& img, Point pt1, Point pt2, const Scalar& color, int thickness=1, int lineType=8, int shift=0)
+	Point pt1(pos.x-W/2, pos.y-H/2); Point pt2(pos.x+W/2, pos.y+H/2);
+	rectangle(im, pt1, pt2, Scalar(1));
+	imshow( "Display window", im );
+	waitKey(1);
+	
 
 	for (frame=2; frame<340; frame++) {
 		// LOG(INFO) << "[Frame]: " << frame;
@@ -198,26 +209,30 @@ int main(int argc, char** argv)
 		cv::Mat res(H, W, CV_32F);
 		CUDA_CHECK(cudaMemcpy(res.data, resp, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
 
-		int cx = res.cols/2;
-        int cy = res.rows/2;
+		LOG(INFO) << res.at<float>(0,0);
+
+	//	int cx = res.cols/2;
+    //    int cy = res.rows/2;
 
         // rearrange the quadrants of Fourier image
         // so that the origin is at the image center
-        Mat tmp;
-        Mat q0(res, Rect(0, 0, cx, cy));
-        Mat q1(res, Rect(cx, 0, cx, cy));
-        Mat q2(res, Rect(0, cy, cx, cy));
-        Mat q3(res, Rect(cx, cy, cx, cy));
+    //    Mat tmp;
+    //    Mat q0(res, Rect(0, 0, cx, cy));
+    //    Mat q1(res, Rect(cx, 0, cx, cy));
+    //    Mat q2(res, Rect(0, cy, cx, cy));
+    //    Mat q3(res, Rect(cx, cy, cx, cy));
 
-        q0.copyTo(tmp);
-        q3.copyTo(q0);
-        tmp.copyTo(q3);
+    //    q0.copyTo(tmp);
+    //    q3.copyTo(q0);
+    //    tmp.copyTo(q3);
 
-        q1.copyTo(tmp);
-        q2.copyTo(q1);
-        tmp.copyTo(q2);
+    //    q1.copyTo(tmp);
+    //    q2.copyTo(q1);
+    //    tmp.copyTo(q2);
 
-        // DO FFTSHIFT
+    //    // DO FFTSHIFT
+	//	LOG(INFO) << res.at<float>(0,0);
+
 
         cv::Point2i pi;
 		double pv;
@@ -228,7 +243,7 @@ int main(int argc, char** argv)
 		if (pi.x > 0 && pi.x < W-1) {
 			p.x += subPixelPeak(res.at<float>(pi.y, pi.x-1), peak_value, res.at<float>(pi.y, pi.x+1));
 		}
-
+		
 		if (pi.y > 0 && pi.y < H-1) {
 			p.y += subPixelPeak(res.at<float>(pi.y-1, pi.x), peak_value, res.at<float>(pi.y+1, pi.x));
 		}
@@ -260,6 +275,12 @@ int main(int argc, char** argv)
 		CUBLAS_CHECK(cublasCsscal(handle_, H*W,&onemin_factor, alphaf, 1)); // scale by (1-factor)
 		CUBLAS_CHECK(cublasCaxpy(handle_, N, &factor, tm1_, 1, xf, 1)); // tmpl += factor * convfeature
 		CUBLAS_CHECK(cublasCaxpy(handle_, H*W, &factor, ts1_, 1, alphaf, 1)); // alphaf += factor * alphaf_
+
+
+		Point pt1(pos.x-W/2, pos.y-H/2); Point pt2(pos.x+W/2, pos.y+H/2);
+		rectangle(im, pt1, pt2, Scalar(1));
+		imshow( "Display window", im );
+		waitKey(1);
 	}
 }
 

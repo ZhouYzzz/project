@@ -7,7 +7,7 @@
 #include "caffe/util/math_functions.hpp"
 #define H 4
 #define W 5
-#define C 1
+#define C 2
 using namespace cv;
 
 int main() {
@@ -35,17 +35,18 @@ int main() {
 	cudaMalloc((void**)&Bg, sizeof(float)*H*W*C);
 	cudaMalloc((void**)&Bc, sizeof(cuComplex)*H*W*C);
 
-	cudaMemcpy(Bg, B.data, sizeof(float)*H*W*C, cudaMemcpyHostToDevice);
+	cudaMemcpy(Bg, B.data, sizeof(float)*H*W, cudaMemcpyHostToDevice);
+	cudaMemcpy(Bg+H*W, B.data, sizeof(float)*H*W, cudaMemcpyHostToDevice);
 	
 	caffe::caffe_gpu_cpy_R2C(H*W, Bg, Bc);
 
 
-	cufftExecC2C(plan, Bc, Bc, CUFFT_FORWARD);
+	// cufftExecC2C(plan, Bc, Bc, CUFFT_FORWARD);
 	cufftExecC2C(plan, Bc, Bc, CUFFT_INVERSE);
 
 	caffe::caffe_gpu_real_C(H*W*C, Bc, Bg);
 
-	cudaMemcpy(B.data, Bg, sizeof(float)*H*W*C, cudaMemcpyDeviceToHost); LOG(INFO) << "\n" << B;
+	cudaMemcpy(B.data, Bg, sizeof(float)*H*W, cudaMemcpyDeviceToHost); LOG(INFO) << "\n" << B;
 	
 	return 0;
 }
