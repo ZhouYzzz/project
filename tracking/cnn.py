@@ -8,18 +8,32 @@ from numpy.fft import *
 from numpy import conj, exp
 from numpy.linalg import norm
 import matplotlib.pyplot as plt
+from scipy import signal
 
 def main():
-    target = np.ones([20,20])
-    a = np.zeros([100,100])
-    b = np.zeros([100,100])
-    b[4:24,4:24] = target
+    target = np.ones([10,10])
+    a = np.zeros([50,50])
+    b = np.zeros([50,50])
     # b[10,10] = 1
-    a[40:60,40:60] = target
-    # print Gcorrelation(a,b)
-    r = Lcorrelation(a,b)
-    print r
-    plt.pcolor(r.real)
+    g = signal.gaussian(50, std=3)
+    prob = g[np.newaxis,:] * g[:,np.newaxis]
+    yf = fft2(prob)
+    h = np.hanning(50)
+    hann = h[np.newaxis,:] * h[:,np.newaxis]
+
+
+    a[20:30,20:30] = target
+    b[4:14,4:14] = target
+
+    kf = Lcorrelation(a,a)
+    xf = fft2(a)
+    alphaf = yf / (kf + 1e-4)
+
+    kzf = Lcorrelation(b, a)
+    res = (ifft2(alphaf*kzf))
+     # print r[3,3]
+    # print r
+    plt.pcolor(res.real)
     plt.show()
     pass
 

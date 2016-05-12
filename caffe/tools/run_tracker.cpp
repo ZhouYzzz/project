@@ -198,7 +198,28 @@ int main(int argc, char** argv)
 		cv::Mat res(H, W, CV_32F);
 		CUDA_CHECK(cudaMemcpy(res.data, resp, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
 
-		cv::Point2i pi;
+		int cx = res.cols/2;
+        int cy = res.rows/2;
+
+        // rearrange the quadrants of Fourier image
+        // so that the origin is at the image center
+        Mat tmp;
+        Mat q0(res, Rect(0, 0, cx, cy));
+        Mat q1(res, Rect(cx, 0, cx, cy));
+        Mat q2(res, Rect(0, cy, cx, cy));
+        Mat q3(res, Rect(cx, cy, cx, cy));
+
+        q0.copyTo(tmp);
+        q3.copyTo(q0);
+        tmp.copyTo(q3);
+
+        q1.copyTo(tmp);
+        q2.copyTo(q1);
+        tmp.copyTo(q2);
+
+        // DO FFTSHIFT
+
+        cv::Point2i pi;
 		double pv;
 		cv::minMaxLoc(res, NULL, &pv, NULL, &pi);
 		float peak_value = (float) pv;
@@ -213,8 +234,8 @@ int main(int argc, char** argv)
 		}
 		p.x -= W / 2.0;
 		p.y -= H / 2.0;
-		pos.x += 4.0*p.x;
-		pos.y += 4.0*p.y;
+		pos.x += p.x;
+		pos.y += p.y;
 		LOG(INFO) <<"Frame:"<<frame <<";"<< p.x << "," << p.y << " pos: " << pos.x << "," << pos.y<<"peak"<<peak_value;
 		// TODO find location
 
