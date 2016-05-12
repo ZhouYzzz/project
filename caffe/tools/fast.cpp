@@ -25,6 +25,7 @@ using namespace std;
 using namespace cv;
 
 cv::Mat createHanningMats(int C, int H, int W);
+cv::Mat createGaussianPeak(int H, int W);
 
 int main(int argc, char** argv)
 {
@@ -43,6 +44,11 @@ int main(int argc, char** argv)
     H = cnn.output_blobs()[0]->height();
     W = cnn.output_blobs()[0]->width();
     N = C * H * W;
+    
+	// TEST mat
+    Mat test(H, W, CV_32F);
+	// LOG(INFO) << test;
+    // TEST BEGIN
 
     cufftHandle planm_;
     cufftHandle plans_;
@@ -102,16 +108,23 @@ int main(int argc, char** argv)
     CUFFT_CHECK(cufftPlan2d(&plans_, H, W, CUFFT_C2C));
 
 	Mat hann_ = createHanningMats(C, H, W);   
+	Mat prob_ = createGaussianPeak(H, W);
 	CUDA_CHECK(cudaMemcpy(tf1_, hann_.data, sizeof(float)*N, cudaMemcpyHostToDevice));
 	caffe::caffe_gpu_cpy_R2C(N, tf1_, hann);
+	CUDA_CHECK(cudaMemcpy(tf1_, prob_.data, sizeof(float)*H*W, cudaMemcpyHostToDevice));
+	caffe::caffe_gpu_cpy_R2C(H*W, tf1_, probf);
+	CUFFT_CHECK(cufftExecC2C(plans_, probf, probf, CUFFT_FORWARD));
+
+	LOG(INFO) << "prob" << prob_;
+	// TODO
+	caffe::caffe_gpu_real_C(N, probf, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    LOG(INFO) << "probf" << test;
 
 
-    // TEST mat
-    Mat test(H, W, CV_32F);
-	// LOG(INFO) << test;
-    // TEST BEGIN
 
-    caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), feat);
+    caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+	caffe::caffe_gpu_mul_C(N, tm1_, hann, feat);
 	// TODO
 	//caffe::caffe_gpu_real_C(N, tm1_, tf1_);
     //CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
@@ -132,16 +145,16 @@ int main(int argc, char** argv)
     CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
     LOG(INFO) << test;
 
-	CUFFT_CHECK(cufftExecC2C(planm_, feat, feat, CUFFT_FORWARD)); // xf = fft(feat)
+	CUFFT_CHECK(cufftExecC2C(planm_, feat, xf, CUFFT_FORWARD)); // xf = fft(feat)
 	
 	// TODO
-	caffe::caffe_gpu_real_C(N, feat, tf1_);
-    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
-    LOG(INFO) << "feat after fft" << test;
+	//caffe::caffe_gpu_real_C(N, feat, tf1_);
+    //CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    //LOG(INFO) << "feat after fft" << test;
 
 	// CUFFT_CHECK(cufftExecC2C(planm_, feat, xf, CUFFT_FORWARD)); // xf = fft(feat)
 
-	caffe::caffe_gpu_mul_cjC(N, feat, feat, tm1_);
+	caffe::caffe_gpu_mul_cjC(N, xf, xf, tm1_);
 	// TODO
 	caffe::caffe_gpu_real_C(N, tm1_, tf1_);
     CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
@@ -155,6 +168,45 @@ int main(int argc, char** argv)
 	caffe::caffe_gpu_real_C(N, ts1_, tf1_);
     CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
     LOG(INFO) << "sum" << test;
+
+	float f = 1.0/(N*H*W);
+	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1));
+	// TODO
+	caffe::caffe_gpu_real_C(N, ts1_, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    LOG(INFO) << "sum and scale" << test;
+
+	caffe::caffe_gpu_add_scalar_C(H*W, ts1_, lambda_, ts2_); // fft(k)+lambda
+	caffe::caffe_gpu_div_C(H*W, probf, ts2_, alphaf); // alphaf = probf / fft(k)+lambda
+	// TODO
+	caffe::caffe_gpu_real_C(N, alphaf, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    LOG(INFO) << "alphaf" << test;
+
+	// ok, now we can get new feature
+	cnn.Forward();
+    caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
+	caffe::caffe_gpu_mul_C(N, tm1_, hann, feat);
+	CUFFT_CHECK(cufftExecC2C(planm_, feat, feat, CUFFT_FORWARD)); // xf = fft(feat), now get zf
+
+	caffe::caffe_gpu_mul_cjC(N, xf, feat, tm1_); // conj(xf).*zf
+	CUBLAS_CHECK(cublasCgemm(handle_, CUBLAS_OP_T, CUBLAS_OP_T,
+				1, H*W, C, &one_, ones_, C, tm1_, H*W, &zero_, ts1_, 1)); // ts1_ = kzf = sum()
+
+	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1)); //scale
+
+	caffe::caffe_gpu_mul_C(H*W, ts1_, alphaf, ts2_);
+	CUFFT_CHECK(cufftExecC2C(plans_, ts2_, ts2_, CUFFT_INVERSE));
+	float fac = 1.0/H*W;
+	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fac, ts2_, 1)); // scale by (1-factor)
+// real part of ts2_ should be response
+
+	// TODO
+	caffe::caffe_gpu_real_C(N, ts2_, tf1_);
+    CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    LOG(INFO) << "resp" << test;
+	
+
 	
 
 	LOG(INFO) << "ALLLLLLLLL";
@@ -176,3 +228,18 @@ cv::Mat createHanningMats(int C, int H, int W) {
 			hann.at<float>(i,j) = hann1d.at<float>(0,j);
 	return hann;
 }
+
+cv::Mat createGaussianPeak(int H, int W) {
+	cv::Mat_<float> res(H, W);
+	int syh = (H) / 2; int sxh = (W) / 2;
+	float output_sigma = sqrt((float) W * H) / 2*0.2;// padding, output_sigma_factor;
+	float mult = -0.5 / (output_sigma * output_sigma);
+	for (int i = 0; i < H; i++)
+		for (int j = 0; j < W; j++) {
+			int ih = i - syh;
+			int jh = j - sxh;
+			res(i, j) = exp(mult * (float) (ih * ih + jh * jh));
+		}
+	return res;
+}
+

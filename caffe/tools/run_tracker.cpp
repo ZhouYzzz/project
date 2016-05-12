@@ -22,7 +22,7 @@ DEFINE_string(model, "SqueezeNet_v1.0/feat.prototxt",
     "The model definition protocol buffer text file.");
 DEFINE_string(weights, "SqueezeNet_v1.0/squeezenet_v1.0.caffemodel",
     "the pretrained weights to for testing.");
-DEFINE_string(vedio, "woman",
+DEFINE_string(vedio, "bolt",
     "vedio squence.");
 
 using namespace cv;
@@ -55,14 +55,15 @@ int main(int argc, char** argv)
     string vedio_path = "database/vot2013/"+FLAGS_vedio;
 	char im_name[20]; sprintf(im_name, "/%08d.jpg", 1);
 	// 207,117,29,103
-    Size2i target_sz(29, 103);
+    // 336,165,25,60
+	Size2i target_sz(25, 60);
     Mat im = imread(vedio_path+string(im_name), CV_LOAD_IMAGE_COLOR);
     Size2i im_sz(im.cols, im.rows);
 	LOG(INFO) << "target_sz:" << target_sz << "im_sz:" << im_sz;
     Size2i window_sz = get_search_window(target_sz, im_sz);
     LOG(INFO) << window_sz;
-	Rect roi(207,117,29,103);
-	Point2f pos(107.0+29.0/2, 117.0+103.0/2);
+	Rect roi(336,165,25,60);
+	Point2f pos(336+25.0/2, 165.0+60.0/2);
 
 	int C, H, W, N;
 
@@ -168,7 +169,9 @@ int main(int argc, char** argv)
 	CUFFT_CHECK(cufftExecC2C(planm_, feat, xf, CUFFT_FORWARD)); // xf = fft(feat)
 
 	caffe::caffe_gpu_mul_cjC(N, xf, xf, tm1_);
-	CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm1_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
+	CUBLAS_CHECK(cublasCgemm(handle_, CUBLAS_OP_T, CUBLAS_OP_T,
+				1, H*W, C, &one_, ones_, C, tm1_, H*W, &zero_, ts1_, 1)); // ts1_ = k
+	// CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm1_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
 	float f = 1.0/(N*H*W);
 	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1));
 	
@@ -194,13 +197,15 @@ int main(int argc, char** argv)
 		CUFFT_CHECK(cufftExecC2C(planm_, feat, zf, CUFFT_FORWARD)); // zf = fft(feat)
 
 		caffe::caffe_gpu_mul_cjC(N, xf, zf, tm1_);
-		CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm1_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
+		CUBLAS_CHECK(cublasCgemm(handle_, CUBLAS_OP_T, CUBLAS_OP_T,
+				1, H*W, C, &one_, ones_, C, tm1_, H*W, &zero_, ts1_, 1)); // ts1_ = k
+		// CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm1_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
 		CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1));
 
 		caffe::caffe_gpu_mul_C(H*W, ts1_, alphaf, ts2_);
 		CUFFT_CHECK(cufftExecC2C(plans_, ts2_, ts2_, CUFFT_INVERSE));
 		float fac = 1.0/H*W;
-		CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fac, ts1_, 1)); // scale by (1-factor)
+		CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fac, ts2_, 1)); // scale by (1-factor)
 
 		
 		caffe::caffe_gpu_real_C(H*W, ts2_, resp);
@@ -209,29 +214,29 @@ int main(int argc, char** argv)
 		cv::Mat res(H, W, CV_32F);
 		CUDA_CHECK(cudaMemcpy(res.data, resp, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
 
-		LOG(INFO) << res.at<float>(0,0);
-
-	//	int cx = res.cols/2;
-    //    int cy = res.rows/2;
-
-        // rearrange the quadrants of Fourier image
-        // so that the origin is at the image center
-    //    Mat tmp;
-    //    Mat q0(res, Rect(0, 0, cx, cy));
-    //    Mat q1(res, Rect(cx, 0, cx, cy));
-    //    Mat q2(res, Rect(0, cy, cx, cy));
-    //    Mat q3(res, Rect(cx, cy, cx, cy));
-
-    //    q0.copyTo(tmp);
-    //    q3.copyTo(q0);
-    //    tmp.copyTo(q3);
-
-    //    q1.copyTo(tmp);
-    //    q2.copyTo(q1);
-    //    tmp.copyTo(q2);
-
-    //    // DO FFTSHIFT
-	//	LOG(INFO) << res.at<float>(0,0);
+//		LOG(INFO) << res.at<float>(0,0);
+//
+//		int cx = res.cols/2;
+//        int cy = res.rows/2;
+//
+//      // rearrange the quadrants of Fourier image
+//      // so that the origin is at the image center
+//        Mat tmp;
+//        Mat q0(res, Rect(0, 0, cx, cy));
+//        Mat q1(res, Rect(cx, 0, cx, cy));
+//        Mat q2(res, Rect(0, cy, cx, cy));
+//        Mat q3(res, Rect(cx, cy, cx, cy));
+//
+//        q0.copyTo(tmp);
+//        q3.copyTo(q0);
+//        tmp.copyTo(q3);
+//
+//        q1.copyTo(tmp);
+//        q2.copyTo(q1);
+//        tmp.copyTo(q2);
+//
+//        // DO FFTSHIFT
+//		LOG(INFO) << res.at<float>(0,0);
 
 
         cv::Point2i pi;
@@ -261,7 +266,9 @@ int main(int argc, char** argv)
 		CUFFT_CHECK(cufftExecC2C(planm_, feat, tm1_, CUFFT_FORWARD)); // tm1_ = xf = fft(feat)
 
 		caffe::caffe_gpu_mul_cjC(N, tm1_, tm1_, tm2_);
-		CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm2_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
+		CUBLAS_CHECK(cublasCgemm(handle_, CUBLAS_OP_T, CUBLAS_OP_T,
+				1, H*W, C, &one_, ones_, C, tm1_, H*W, &zero_, ts1_, 1)); // ts1_ = k
+		// CUBLAS_CHECK(cublasCgemv(handle_, CUBLAS_OP_T, C, H*W, &one_, tm2_, C, ones_, 1, &zero_, ts1_, 1)); // ts1_ = kf
 		CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1));
 	
 		caffe::caffe_gpu_add_scalar_C(H*W, ts1_, lambda_, ts2_); // fft(k)+lambda
