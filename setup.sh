@@ -6,9 +6,9 @@ cp -a $ROOT/caffe/src/caffe/layers/. $FASTER_RCNN/caffe-fast-rcnn/src/caffe/laye
 cp -a $ROOT/caffe/include/caffe/layers/. $FASTER_RCNN/caffe-fast-rcnn/include/caffe/layers/.
 
 cd $CAFFE
-make -j8
+make
 cd $ROOT
 
 cd $FASTER_RCNN/caffe-fast-rcnn
-make -j8
+make
 cd $ROOT
