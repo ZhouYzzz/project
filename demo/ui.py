@@ -1,12 +1,13 @@
-import cv2
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import time
 
-cap = cv2.VideoCapture(0)
+plt.figure(figsize=(4,4))
+img = mpimg.imread('tmp.jpg')
+plt.imshow(img)
 
-while(True):
-    ret, frame = cap.read()
-    cv2.putText(frame, 'HAHAH', (200,200), cv2.FONT_HERSHEY_PLAIN, 4, (255,255,255), 2)
-    cv2.imshow('cam', frame)
+plt.show()
 
-    cv2.waitKey(1)
-
-
+time.sleep(2)
+img = mpimg.imread('person_im.jpg')
+plt.imshow(img)

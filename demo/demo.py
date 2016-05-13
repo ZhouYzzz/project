@@ -3,6 +3,7 @@ from threading import Thread
 import requests
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 
 frame = None
 posted_frame = None
@@ -16,6 +17,20 @@ URL_detect = 'http://zhouyz14.deephi.i.deephi.tech:5000/detection/api/'
 URL_reid = 'http://zhouyz14.deephi.i.deephi.tech:5000/reid/req_to_database/'
 rect = None
 detected_rect = None
+
+name = None
+distance = 10
+
+def update_title():
+    global name, distance
+    if TRACK:
+        if (name is not None) and (distance <= 1 ):
+            return 'Tracking... person may be [ %s ] ~ [ %.3f ]'%(name, distance)
+        else:
+            return 'Tracking... '
+    else:
+        return 'No person detected...'
+
 
 def req_to_server():
     global frame, posted_frame
@@ -51,15 +66,18 @@ def req_to_server():
 
 def req_reid():
     global person_im, rect
+    global name, distance
     while True:
         if rect is not None:
-            print rect
+            # print rect
             person_im = frame[rect[1]:rect[3],rect[0]:rect[2],:]
 
             cv2.imwrite('person_im.jpg', person_im)
             f = open('person_im.jpg')
             r = requests.post(url=URL_reid, files={'upload': f})
-            print r.text
+            name = r.json()['name']
+            distance = float(r.json()['dist'])
+            print 'Re-id:',name,'~',distance
             time.sleep(1)
         else:
             time.sleep(0.5)
@@ -98,7 +116,8 @@ def main():
             # print pt1, pt2, rect
             cv2.rectangle(frame, pt1, pt2, (255,255,255), 2)
 
-        cv2.imshow('video', frame)
+        # print update_title()
+        cv2.imshow('Person Tracking and Re-identification', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
