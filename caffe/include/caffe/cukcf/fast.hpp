@@ -2,6 +2,7 @@
 #include "opencv2/opencv.hpp"
 #include "cufft.h"
 #include "cuComplex.h"
+#include "caffe/data_transformer.hpp"
 
 using namespace std;
 using namespace caffe;
@@ -64,4 +65,4 @@ protected:
     cuComplex* tm2_;
     cuComplex* ts1_;
     cuComplex* ts2_;
-}
+};

@@ -12,7 +12,7 @@ using namespace cv;
 cv::Mat createGaussianPeak_(int H, int W);
 cv::Mat createHanningMats_(int C, int H, int W);
 
-Fast::Fast(string model, string weights, TransformationParameter trans_param) 
+Fast::Fast(string model, string weights) 
 : cnn(model, TEST), trans(trans_param, TEST)
 {
     cnn.CopyTrainedLayersFrom(weights);
