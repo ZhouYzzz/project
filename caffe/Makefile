@@ -179,7 +179,10 @@ ifneq ($(CPU_ONLY), 1)
 endif
 
 # YZ ZHOU
-LIBRARIES += cufft
+INCLUDE_DIRS += /home/zhouyz14/vot-toolkit/native/trax/lib
+INCLUDE_DIRS += /home/zhouyz14/vot-toolkit/tracker/examples/native
+LIBRARY_DIRS += /home/zhouyz14/vot-toolkit/native/trax
+LIBRARIES += cufft trax
 LIBRARIES += glog gflags protobuf boost_system boost_filesystem m hdf5_hl hdf5
 
 

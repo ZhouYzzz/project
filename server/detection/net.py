@@ -19,9 +19,10 @@ CLASSES = ('__background__',
            'motorbike', 'person', 'pottedplant',
            'sheep', 'sofa', 'train', 'tvmonitor')
 
-CONF_THRESH = 0.8
+CONF_THRESH = 0.6
 NMS_THRESH = 0.3
 
+cfg.TEST.HAS_RPN = True
 # NET
 caffe.set_mode_gpu()
 caffe.set_device(1)
@@ -40,14 +41,16 @@ def high_prob(dets, thresh=0.5):
 def person_detection(im):
     scores, boxes = im_detect(net, im)
 
-    # cls_ind = 14 + 1 # 14 -- 'person'
+    cls_ind = 14 + 1 # 14 -- 'person'
 
-    for cls_ind, cls in enumerate(CLASSES[1:]):
-        cls_ind += 1 # skip background
-        cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
-        cls_scores = scores[:, cls_ind]
-        dets = np.hstack((cls_boxes,
-                          cls_scores[:, np.newaxis])).astype(np.float32)
-        keep = nms(dets, NMS_THRESH)
-        dets = dets[keep, :]
+    #for cls_ind, cls in enumerate(CLASSES[1:]):
+    # for cls_ind, cls in [(14, 'person')]:
+    # cls_ind += 1 # skip background
+    cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
+    cls_scores = scores[:, cls_ind]
+    # print cls_scores
+    dets = np.hstack((cls_boxes,
+                    cls_scores[:, np.newaxis])).astype(np.float32)
+    keep = nms(dets, NMS_THRESH)
+    dets = dets[keep, :]
     return high_prob(dets, CONF_THRESH)

@@ -23,6 +23,7 @@ void Fast::init(const Rect &roi, Mat image)
     // get size
     Size2i window_sz(2.5*roi.height, 2.5*roi.width);
     window_sz_ = window_sz;
+	LOG(INFO) << window_sz_;
     roi_ = roi;
     cnn.input_blobs()[0]->Reshape(1, 3, window_sz.height, window_sz.width);
     cnn.Reshape();
@@ -33,12 +34,14 @@ void Fast::init(const Rect &roi, Mat image)
     // scale factor due to cnn
     H_scal = float(window_sz.height) / H;
     W_scal = float(window_sz.width) / W;
+	LOG(INFO) << H_scal << " " << W_scal;
+	LOG(INFO) << C << " " << H << " " << W;
 
     // initialization
+    init_handles();
     init_constants();
     init_mem_space();
     init_hann_and_gaussian();
-    init_handles();
 
     extractFeature(roi_, image);
     caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
@@ -69,13 +72,14 @@ void Fast::update(Mat image)
     float fs = 1.0 / (H*W);
     CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fs, ts2_, 1));
     caffe::caffe_gpu_real_C(N, ts2_, tf1_);
-    CUDA_CHECK(cudaMemcpy(resp.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(resp.data, tf1_, sizeof(float)*H*W, cudaMemcpyDeviceToHost));
 
     Point2i pi;
     double pv;
     cv::minMaxLoc(resp, NULL, &pv, NULL, &pi);
     float peak_value = (float) pv;
     // fine estimate
+	LOG(INFO) << pi;
     roi_.x += W_scal * (pi.x - W / 2);
     roi_.y += H_scal * (pi.y - H / 2);
 
@@ -140,7 +144,8 @@ void Fast::init_mem_space()
     CUDA_CHECK(cudaMalloc((void**)&ts1_, sizeof(cuComplex)*H*W));
     CUDA_CHECK(cudaMalloc((void**)&ts2_, sizeof(cuComplex)*H*W));
 
-    Mat resp(H, W, CV_32F);
+	Mat resp_(H, W, CV_32F);
+	resp = resp_;
 }
 
 void Fast::init_hann_and_gaussian()

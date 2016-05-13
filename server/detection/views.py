@@ -1,9 +1,10 @@
 from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 
+from django.views.defaults import bad_request
 from django.views.decorators.csrf import csrf_exempt
 from .net import person_detection
-
+from cv2 import imread
 # Create your views here.
 
 def index(request):

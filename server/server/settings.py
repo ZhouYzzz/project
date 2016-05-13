@@ -25,7 +25,8 @@ SECRET_KEY = 'p13*6hurt7$(kko&l4o8=&4z_xxhuzh#^et&v4*e_9cd0$+bnd'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1']
+ALLOWED_HOSTS = ['127.0.0.1',
+                 'zhouyz14.deephi.i.deephi.tech']
 
 
 # Application definition

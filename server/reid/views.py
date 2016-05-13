@@ -1,5 +1,5 @@
 from django.shortcuts import render, render_to_response, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.core.urlresolvers import reverse
 from django.views.defaults import bad_request
 from .models import Person
@@ -78,7 +78,8 @@ def req_to_database(request):
         image = resize(image, (128,256))
     feature = get_feature(image)
     id_rank, dist = compare_to_gallery(feature)
-    return HttpResponse(Person.objects.get(id=id_rank[0]).name+str(dist[0]))
+    # return HttpResponse(Person.objects.get(id=id_rank[0]).name+str(dist[0]))
+    return JsonResponse({'name': Person.objects.get(id=id_rank[0]).name, 'dist': str(dist[0])})
 
 """ Add new person to database """
 @csrf_exempt
