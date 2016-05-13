@@ -22,16 +22,17 @@ public:
 
 private:
     Rect roi_;
+	Size2i window_sz_;
 
     void init_handles();
     void init_constants();
     void init_mem_space();
     void init_hann_and_gaussian();
-    void get_search_window_();
-    void extractFeature();
+    Rect get_search_window_(const Rect &roi, Size2i window_sz);
+    void extractFeature(const Rect &roi, Mat image);
 
     TransformationParameter trans_param;
-    DataTransformer<float> trans(trans_param, TEST);
+    DataTransformer<float> trans;
 
 protected:
     // handles

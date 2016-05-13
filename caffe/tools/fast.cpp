@@ -169,7 +169,7 @@ int main(int argc, char** argv)
     CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
     LOG(INFO) << "sum" << test;
 
-	float f = 1.0/(N*H*W);
+	float f = 1.0/(N);
 	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &f, ts1_, 1));
 	// TODO
 	caffe::caffe_gpu_real_C(N, ts1_, tf1_);
@@ -197,7 +197,7 @@ int main(int argc, char** argv)
 
 	caffe::caffe_gpu_mul_C(H*W, ts1_, alphaf, ts2_);
 	CUFFT_CHECK(cufftExecC2C(plans_, ts2_, ts2_, CUFFT_INVERSE));
-	float fac = 1.0/H*W;
+	float fac = 1.0/(H*W);
 	CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fac, ts2_, 1)); // scale by (1-factor)
 // real part of ts2_ should be response
 
@@ -205,7 +205,14 @@ int main(int argc, char** argv)
 	caffe::caffe_gpu_real_C(N, ts2_, tf1_);
     CUDA_CHECK(cudaMemcpy(test.data, tf1_, sizeof(float)*N, cudaMemcpyDeviceToHost));
     LOG(INFO) << "resp" << test;
-	
+
+	cv::Point2i pi;
+	double pv;
+	cv::minMaxLoc(test, NULL, &pv, NULL, &pi);
+	float peak_value = (float) pv;
+
+	LOG(INFO) << pi;
+	LOG(INFO) << pi.x - W/2 << " " << pi.y - H/2;
 
 	
 

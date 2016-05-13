@@ -19,7 +19,7 @@ test_interval: 200
 display: 20
 
 # snapshots
-snapshot: 3000
+snapshot: 5000
 snapshot_prefix: "snapshots/train_val"
 
 # GPU / CPU

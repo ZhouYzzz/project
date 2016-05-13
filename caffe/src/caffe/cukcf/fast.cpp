@@ -12,7 +12,8 @@ using namespace cv;
 cv::Mat createGaussianPeak_(int H, int W);
 cv::Mat createHanningMats_(int C, int H, int W);
 
-Fast::Fast(string model, string weights) : cnn(model, TEST), trans()
+Fast::Fast(string model, string weights, TransformationParameter trans_param) 
+: cnn(model, TEST), trans(trans_param, TEST)
 {
     cnn.CopyTrainedLayersFrom(weights);
 }
@@ -20,8 +21,7 @@ Fast::Fast(string model, string weights) : cnn(model, TEST), trans()
 void Fast::init(const Rect &roi, Mat image)
 {
     // get size
-    Size2i target_sz = roi.size();
-    Size2i window_sz = 2.5 * target_sz;
+    Size2i window_sz(2.5*roi.height, 2.5*roi.width);
     window_sz_ = window_sz;
     roi_ = roi;
     cnn.input_blobs()[0]->Reshape(1, 3, window_sz.height, window_sz.width);
@@ -73,7 +73,7 @@ void Fast::update(Mat image)
 
     Point2i pi;
     double pv;
-    cv::minMaxLoc(res, NULL, &pv, NULL, &pi);
+    cv::minMaxLoc(resp, NULL, &pv, NULL, &pi);
     float peak_value = (float) pv;
     // fine estimate
     roi_.x += W_scal * (pi.x - W / 2);
@@ -86,7 +86,6 @@ void Fast::update(Mat image)
     caffe::caffe_gpu_mul_cjC(N, xf, xf, tm1_);
     CUBLAS_CHECK(cublasCgemm(handle_, CUBLAS_OP_T, CUBLAS_OP_T,
                 1, H*W, C, &one_, ones_, C, tm1_, H*W, &zero_, ts1_, 1));
-    float fm = 1.0 / N;
     CUBLAS_CHECK(cublasCsscal(handle_, H*W, &fm, ts1_, 1));
     caffe::caffe_gpu_add_scalar_C(H*W, ts1_, lambda_, ts2_);
     caffe::caffe_gpu_div_C(H*W, probf, ts2_, alphaf);
@@ -146,11 +145,11 @@ void Fast::init_mem_space()
 
 void Fast::init_hann_and_gaussian()
 {
-    Mat hann_ = createHanningMats(C, H, W);
+    Mat hann_ = createHanningMats_(C, H, W);
     CUDA_CHECK(cudaMemcpy(tf1_, hann_.data, sizeof(float)*N, cudaMemcpyHostToDevice));
     caffe::caffe_gpu_cpy_R2C(N, tf1_, hann);
 
-    Mat prob_ = createGaussianPeak(H, W);
+    Mat prob_ = createGaussianPeak_(H, W);
     CUDA_CHECK(cudaMemcpy(tf1_, prob_.data, sizeof(float)*H*W, cudaMemcpyHostToDevice));
     caffe::caffe_gpu_cpy_R2C(H*W, tf1_, probf);
     CUFFT_CHECK(cufftExecC2C(plans_, probf, probf, CUFFT_FORWARD));
@@ -172,7 +171,7 @@ void Fast::extractFeature(const Rect &roi, Mat image)
 {
     Rect window = get_search_window_(roi, window_sz_);
     Mat z = RectTools::subwindow(image, window, BORDER_REPLICATE);
-    trans.Transform(z, cnn->input_blobs()[0]);
+    trans.Transform(z, cnn.input_blobs()[0]);
     cnn.Forward();
 }
 
