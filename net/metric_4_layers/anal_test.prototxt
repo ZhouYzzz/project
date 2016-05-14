@@ -1225,18 +1225,15 @@ layer {
 # ===== LOSS =====
 
 layer {
-  name: "loss"
-  type: "ContrastiveLoss"
+  name: "analyse"
+  type: "Python"
   bottom: "anchor/feat"
   bottom: "pair/feat"
   bottom: "label"
-  top: "loss"
   top: "dist_sim"
-  top: "dist_dif"
-  loss_weight: 1
-  loss_weight: 0
-  loss_weight: 0
-  contrastive_loss_param {
-    margin: 2
+  top: "dist_diff"
+  python_param {
+    module: "layer"
+    layer: "AnalyseLayer"
   }
 }

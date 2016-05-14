@@ -9,7 +9,7 @@ caffe.set_device(2)
 dist_sim = np.array([],dtype=np.float32)
 dist_diff = np.array([],dtype=np.float32)
 
-net = caffe.Net('anal_train.prototxt','snapshots/train_val_iter_20000.caffemodel',caffe.TEST)
+net = caffe.Net('anal_test.prototxt','snapshots/train_val_iter_20000.caffemodel',caffe.TEST)
 
 N = 100
 
@@ -17,7 +17,7 @@ for i in xrange(N):
     result = net.forward()
     # print result
     dist_sim = np.append(dist_sim, result['dist_sim'].copy())
-    dist_diff = np.append(dist_diff, result['dist_dif'].copy())
+    dist_diff = np.append(dist_diff, result['dist_diff'].copy())
 
 
 plt.subplot(2, 1, 1)
