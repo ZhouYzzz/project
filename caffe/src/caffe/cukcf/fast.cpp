@@ -58,6 +58,8 @@ void Fast::init(const Rect &roi, Mat image)
 
 void Fast::update(Mat image)
 {
+	caffe::Timer t;
+	t.Start();
     extractFeature(roi_, image);
     caffe::caffe_gpu_cpy_R2C(N, cnn.output_blobs()[0]->gpu_data(), tm1_);
     caffe::caffe_gpu_mul_C(N, tm1_, hann, feat);
@@ -103,6 +105,8 @@ void Fast::update(Mat image)
     CUBLAS_CHECK(cublasCsscal(handle_, H*W,&one_min_factor, model_alphaf, 1));
     CUBLAS_CHECK(cublasCaxpy(handle_, N, &factor, xf, 1, model_xf, 1));
     CUBLAS_CHECK(cublasCaxpy(handle_, H*W, &factor, alphaf, 1, model_alphaf, 1));
+	t.Stop();
+	LOG(INFO) << t.MilliSeconds();
 }
 
 Rect Fast::get() { return roi_; }
