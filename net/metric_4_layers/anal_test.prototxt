@@ -24,7 +24,7 @@ layer {
   }
   python_param {
     module: "layer"
-	layer: "ValidMetricDataLayer"
+	layer: "MetricDataLayer"
 	share_in_parallel: true
 	param_str: "VIPeR"
   }

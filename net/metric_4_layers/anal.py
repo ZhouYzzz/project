@@ -9,24 +9,25 @@ caffe.set_device(2)
 dist_sim = np.array([],dtype=np.float32)
 dist_diff = np.array([],dtype=np.float32)
 
-net = caffe.Net('anal_test.prototxt','snapshots/train_val_iter_10000.caffemodel',caffe.TEST)
+net = caffe.Net('anal_train.prototxt','snapshots/train_val_iter_20000.caffemodel',caffe.TEST)
 
 N = 100
 
 for i in xrange(N):
     result = net.forward()
+    # print result
     dist_sim = np.append(dist_sim, result['dist_sim'].copy())
-    dist_diff = np.append(dist_diff, result['dist_diff'].copy())
+    dist_diff = np.append(dist_diff, result['dist_dif'].copy())
 
 
 plt.subplot(2, 1, 1)
 plt.hist(dist_sim, bins=100, normed=True)
-plt.xlim(0,3)
+plt.xlim(0,5)
 plt.title('distance distribution of SIMILAR pairs')
 
 plt.subplot(2, 1, 2)
 plt.hist(dist_diff, bins=100, normed=True)
-plt.xlim(0,3)
+plt.xlim(0,5)
 plt.title('distance distribution of DIFFERENT pairs')
 
 plt.show()
